@@ -45,8 +45,13 @@ class CaptureResultStore(
     }
 
     fun take(frameTimestampNanos: Long): CaptureResult? = synchronized(lock) {
-        map.remove(frameTimestampNanos)?.result
+        val result = map.remove(frameTimestampNanos)?.result
+        if (result == null) missedCount++
+        result
     }
 
     fun clear() = synchronized(lock) { map.clear() }
+
+    @Volatile var missedCount: Int = 0
+        private set
 }

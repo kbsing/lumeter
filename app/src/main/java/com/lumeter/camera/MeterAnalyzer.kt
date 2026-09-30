@@ -56,7 +56,7 @@ class MeterAnalyzer(
     @Volatile var calibrationEv: Double = 0.0
 
     private val statRing = ArrayDeque<MeteringFrameStat>()
-    private val exposureHistory = ArrayDeque<Long>()
+    private val exposureHistory = ArrayDeque<FrameExposure>()
     private var lastPublishedReading: MeterReading? = null
     private var lastHistogram: IntArray? = null
     private var frameCounter = 0
@@ -64,7 +64,8 @@ class MeterAnalyzer(
     @androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
     override fun analyze(image: ImageProxy) {
         try {
-            val captureResult = resultStore.take(image.imageInfo.timestamp) ?: return
+            val captureResult = resultStore.take(image.imageInfo.timestamp)
+            if (captureResult == null) return
 
             val exposure = frameExposure(captureResult) ?: return
             val decoder = ProcessedLumaMetadata.decoder(captureResult)
@@ -136,6 +137,17 @@ class MeterAnalyzer(
                 lastHistogram = analyzer.histogram()
             }
             frameCounter++
+            if (frameCounter % LOG_INTERVAL_FRAMES == 0) {
+                val last = statRing.lastOrNull()
+                android.util.Log.i(
+                    TAG,
+                    "ev100=${last?.ev100} luma=${last?.luma} converged=$converged " +
+                        "ring=${statRing.size} iso=${exposure.sensitivity} " +
+                        "t_ns=${exposure.exposureTimeNs} aperture=${exposure.aperture} " +
+                        "tonemap=${captureResult.get(CaptureResult.TONEMAP_MODE)} " +
+                        "pairMissed=${resultStore.missedCount}",
+                )
+            }
 
             val fused = if (statRing.isNotEmpty()) {
                 MeteringFusion.fuse(statRing.toList(), MeteringSource.YUV_PREVIEW)
@@ -183,22 +195,33 @@ class MeterAnalyzer(
         return FrameExposure(time, sensitivity, aperture)
     }
 
+    /**
+     * HAL-reported exposure jitters by tiny amounts frame to frame (±1 ISO step, a few
+     * hundred ns), so exact equality never holds on real devices. Treat the exposure as
+     * stable while every frame in the window sits within [STABLE_TOLERANCE_EV] of the first.
+     */
     private fun exposureStable(exposure: FrameExposure): Boolean {
-        exposureHistory.addLast(exposure.exposureTimeNs * 1000 + exposure.sensitivity)
+        exposureHistory.addLast(exposure)
         while (exposureHistory.size > STABLE_FRAME_WINDOW) exposureHistory.removeFirst()
         if (exposureHistory.size < STABLE_FRAME_WINDOW) return false
         val first = exposureHistory.first()
-        return exposureHistory.all { it == first }
+        return exposureHistory.all { frame ->
+            abs(EvMath.log2(frame.exposureTimeNs.toDouble() / first.exposureTimeNs)) < STABLE_TOLERANCE_EV &&
+                abs(EvMath.log2(frame.sensitivity.toDouble() / first.sensitivity.toDouble())) < STABLE_TOLERANCE_EV
+        }
     }
 
     private fun aeStateConverged(result: CaptureResult): Boolean =
         result.get(CaptureResult.CONTROL_AE_STATE) == CameraMetadata.CONTROL_AE_STATE_CONVERGED
 
     private companion object {
+        private const val TAG = "LumeterMeter"
         private const val STABLE_FRAME_WINDOW = 4
+        private const val STABLE_TOLERANCE_EV = 1.0 / 24.0 // ignore ±1/24 EV HAL jitter
         private const val STAT_RING_SIZE = 5
         private const val HISTOGRAM_INTERVAL_FRAMES = 4
         private const val PUBLISH_DELTA_EV = 1.0 / 12.0
+        private const val LOG_INTERVAL_FRAMES = 30
     }
 }
 
