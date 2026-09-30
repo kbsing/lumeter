@@ -1,0 +1,21 @@
+Lumeter (光度计)
+Copyright 2026
+
+This product includes software derived from lightstop
+(https://github.com/the-waterwheel/lightstop), licensed under the Apache License 2.0:
+
+- Processed-stream luma math: tonemap curve inversion, YUV→linear conversion
+  (from ProcessedLumaMath.kt / ProcessedLumaMetadata.kt)
+- Robust metering fusion via median statistics (from MeteringFusion.kt)
+- Aperture/shutter scale and exposure pairing math (from MeterModels.kt, ExposureMath)
+- Metering calibration reference math (from CalibrationMath.kt)
+- EV100 conversion from camera exposure metadata (from MeteringAnalysis.kt)
+
+Modifications: rewritten for Jetpack Compose + CameraX, decoupled from manual
+Camera2 session management.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
