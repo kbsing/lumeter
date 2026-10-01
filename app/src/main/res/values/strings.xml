@@ -118,4 +118,7 @@
     <string name="language">Language</string>
     <string name="language_system">System</string>
     <string name="collapse">Collapse</string>
+    <string name="too_bright">Too bright</string>
+    <string name="too_dark">Too dark</string>
+    <string name="scale_limit">Scale limit</string>
 </resources>

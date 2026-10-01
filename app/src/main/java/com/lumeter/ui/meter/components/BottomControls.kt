@@ -161,16 +161,16 @@ private fun ExpandedPanel(vm: AppViewModel) {
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val solver = vm.solverResult
+            val result = vm.exposureResult
             val apertureLocked = vm.exposureMode == ExposureMode.SHUTTER_PRIORITY
             val shutterLocked = vm.exposureMode == ExposureMode.APERTURE_PRIORITY
-            val apertureValue = if (apertureLocked && solver != null) {
-                solver.apertureSnapped
+            val apertureValue = if (apertureLocked && result.solvedAperture != null) {
+                result.solvedAperture
             } else {
                 vm.userAperture
             }
-            val shutterValue = if (shutterLocked && solver != null) {
-                solver.shutterSnapped
+            val shutterValue = if (shutterLocked && result.solvedShutter != null) {
+                result.solvedShutter
             } else {
                 vm.userShutter
             }
@@ -270,14 +270,16 @@ private fun ExpandedPanel(vm: AppViewModel) {
                     .clip(RoundedCornerShape(6.dp))
                     .clickable {
                         tick()
-                        val solver = vm.solverResult
+                        val result = vm.exposureResult
                         val ev = vm.ev100 ?: return@clickable
                         val ap = when (vm.exposureMode) {
-                            ExposureMode.SHUTTER_PRIORITY -> solver?.apertureSnapped ?: vm.userAperture
+                            ExposureMode.SHUTTER_PRIORITY ->
+                                result.solvedAperture ?: vm.userAperture
                             else -> vm.userAperture
                         }
                         val sh = when (vm.exposureMode) {
-                            ExposureMode.APERTURE_PRIORITY -> solver?.shutterSnapped ?: vm.userShutter
+                            ExposureMode.APERTURE_PRIORITY ->
+                                result.solvedShutter ?: vm.userShutter
                             else -> vm.userShutter
                         }
                         vm.logReading(ev, ap, sh)
@@ -293,14 +295,14 @@ private fun ExpandedPanel(vm: AppViewModel) {
                     .border(1.5.dp, ColorInk.copy(alpha = 0.8f), CircleShape)
                     .clickable {
                         tick()
-                        vm.toggleMeterPause()
+                        vm.measureNow()
                     },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    if (vm.effectiveLive) "\u275A\u275A" else "\u25B6",
-                    color = ColorAccent,
-                    fontSize = 16.sp,
+                    if (vm.measuring) "\u25CF" else "\u25C9",
+                    color = if (vm.measuring) ColorAccent else ColorInk,
+                    fontSize = 20.sp,
                 )
             }
 
@@ -321,16 +323,20 @@ private fun CollapsedBar(vm: AppViewModel) {
     fun tick() {
         if (vm.hapticFeedback) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
     }
-    val solver = vm.solverResult
+    val result = vm.exposureResult
     val apertureLocked = vm.exposureMode == ExposureMode.SHUTTER_PRIORITY
     val shutterLocked = vm.exposureMode == ExposureMode.APERTURE_PRIORITY
-    val apertureText = if (apertureLocked) {
-        solver?.let { FormatUtils.aperture(it.apertureSnapped) } ?: "AUTO"
+    val apertureText = if (apertureLocked && result.solvedAperture != null) {
+        FormatUtils.aperture(result.solvedAperture)
+    } else if (apertureLocked) {
+        stringResource(R.string.auto).uppercase()
     } else {
         FormatUtils.aperture(vm.userAperture)
     }
-    val shutterText = if (shutterLocked) {
-        solver?.let { FormatUtils.shutter(it.shutterSnapped) } ?: "AUTO"
+    val shutterText = if (shutterLocked && result.solvedShutter != null) {
+        FormatUtils.shutter(result.solvedShutter)
+    } else if (shutterLocked) {
+        stringResource(R.string.auto).uppercase()
     } else {
         FormatUtils.shutter(vm.userShutter)
     }

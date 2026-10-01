@@ -1,20 +1,27 @@
 package com.lumeter.ui
 
 import android.app.Application
+import androidx.camera.view.PreviewView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.lumeter.camera.CameraManager
 import com.lumeter.camera.MeterEngineState
+import com.lumeter.camera.MeterSpot
+import com.lumeter.core.exposure.ExposureEngine
 import com.lumeter.core.exposure.ExposureMode
+import com.lumeter.core.exposure.ExposureResult
 import com.lumeter.core.exposure.ExposureSolver
-import com.lumeter.core.exposure.SolverResult
+import com.lumeter.core.exposure.ExposureState
+import com.lumeter.core.exposure.MeterReading
+import com.lumeter.core.exposure.ReadingInvalidReason
+import com.lumeter.core.exposure.ResultKind
 import com.lumeter.core.meter.MeteringMode
 import com.lumeter.data.ActiveField
 import com.lumeter.data.FilmStock
-import com.lumeter.data.FilmStocks
 import com.lumeter.data.PreferencesRepository
 import com.lumeter.data.Reading
 import com.lumeter.data.ReadingRepository
@@ -22,18 +29,21 @@ import com.lumeter.data.LumeterDatabase
 import com.lumeter.data.SpotAggregation
 import com.lumeter.data.SpotMeasurement
 import com.lumeter.ui.theme.AccentColor
-import androidx.camera.view.PreviewView
-import androidx.lifecycle.LifecycleOwner
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.log2
 
 /**
- * Main application state manager.
- * Coordinates UI state across all screens: meter, history, film, settings, calibration,
- * and bridges the metering engine + persistence.
+ * Main application state manager. Coordinates UI state across all screens and bridges
+ * the metering engine, the pure exposure evaluator, and persistence.
+ *
+ * Operating model (per the metering spec):
+ * - LIVE: the reading streams continuously.
+ * - HELD (the primary handheld-meter workflow): the reading is frozen; the main action
+ *   button takes exactly one fresh stable reading. Adjusting ISO/aperture/shutter
+ *   re-evaluates against the frozen reading but never re-meters.
  */
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -47,14 +57,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var currentPage by mutableStateOf(AppPage.METER)
         private set
 
-    // Engine-derived state (published by CameraManager, throttled here)
+    // Engine-derived state
     var engineSceneEv by mutableStateOf<Double?>(null)
         private set
-
-    /** Full-frame median linear luma (0..1) of the current stable reading. */
     var engineRawLuma by mutableStateOf(0.0)
         private set
-    var engineSpotEvs by mutableStateOf<List<Double>>(emptyList())
+    var engineClipped by mutableStateOf(0.0)
         private set
     var aeConverged by mutableStateOf(false)
         private set
@@ -70,7 +78,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val meteringMode: MeteringMode get() = _meteringMode
     var ndFilter by mutableStateOf(0)
         private set
-    var aeHold by mutableStateOf(false)
+
+    // Session model: LIVE streams, HELD freezes + one-shot metering.
+    var continuous by mutableStateOf(true)
+        private set
+    var measuring by mutableStateOf(false)
         private set
 
     // Exposure settings
@@ -100,17 +112,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // Settings
     var liveMetering by mutableStateOf(true)
         private set
-
-    /** Session-level pause from the bottom action button; never persisted. */
-    var meterPaused by mutableStateOf(false)
-        private set
-
-    /** Whether the bottom parameter panel is expanded (session state). */
-    var controlsExpanded by mutableStateOf(true)
-        private set
-
-    /** Metering actually streams only when the preference is on and not session-paused. */
-    val effectiveLive: Boolean get() = liveMetering && !meterPaused
     var thirdStopIncrements by mutableStateOf(false)
         private set
     private var _hapticFeedback by mutableStateOf(true)
@@ -124,8 +125,80 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var _kConstant by mutableStateOf(12.5)
     val kConstant: Double get() = _kConstant
 
+    /** Bottom parameter panel expansion (session state). */
+    var controlsExpanded by mutableStateOf(true)
+        private set
+
     var flashKey by mutableStateOf(0)
         private set
+
+    // ---- Reading model ----
+
+    /** Scene EV100 shown to the user: raw scene + calibration + K shift. Never ND. */
+    val sceneEv: Double?
+        get() = engineSceneEv?.let { it + calOffset + ExposureSolver.calibrationShift(kConstant) }
+
+    /** Alias kept for the UI. */
+    val ev100: Double? get() = sceneEv
+
+    /** Spread between the brightest and darkest MULTI spot, in EV. */
+    val spread: Double
+        get() {
+            val shifted = spotDisplayEvs.filter { it.isFinite() }
+            return if (shifted.size > 1) shifted.max() - shifted.min() else 0.0
+        }
+
+    /** Per-spot EVs on the same pure chain as [sceneEv]. */
+    val spotDisplayEvs: List<Double>
+        get() = engineSpotEvs.map { it + calOffset + ExposureSolver.calibrationShift(kConstant) }
+
+    private var engineSpotEvs: List<Double> = emptyList()
+
+    private val multiActive: Boolean get() = meteringMode == MeteringMode.MULTI
+
+    private val aggOffset: Double
+        get() {
+            if (!multiActive || engineSpotEvs.isEmpty()) return 0.0
+            val shifted = spotDisplayEvs.filter { it.isFinite() }
+            if (shifted.isEmpty()) return 0.0
+            val base = sceneEv ?: return 0.0
+            val value = when (spotAggregation) {
+                SpotAggregation.AVG -> shifted.average()
+                SpotAggregation.HIGH -> shifted.max()
+                SpotAggregation.LOW -> shifted.min()
+            }
+            return value - base
+        }
+
+    /** The reading the evaluator sees: LIVE streams, HELD freezes. */
+    private var liveReading: MeterReading? = null
+    private var frozenReading: MeterReading? = null
+    private var lastAdoptedEv: Double? = null
+
+    val activeReading: MeterReading?
+        get() = if (continuous) liveReading else frozenReading
+
+    private fun currentState(): ExposureState {
+        val multi = if (multiActive) aggOffset else 0.0
+        return ExposureState(
+            mode = exposureMode,
+            aperture = userAperture,
+            shutter = userShutter,
+            iso = userIso,
+            biasStops = expComp - multi,
+            ndStops = ndFilter,
+        )
+    }
+
+    val exposureResult: ExposureResult
+        get() = ExposureEngine.evaluate(currentState(), activeReading)
+
+    val needle: Double get() = exposureResult.stops ?: 0.0
+    val matched: Boolean
+        get() = exposureResult.kind == ResultKind.OK && exposureResult.stops == 0.0
+
+    val luxText: String
+        get() = sceneEv?.let { ExposureSolver.approxLux(it, 0).toInt().toString() } ?: "--"
 
     init {
         viewModelScope.launch {
@@ -137,10 +210,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun applyPreferences(p: com.lumeter.data.UserPreferences) {
-        if (preferencesLoaded) {
-            // Only the very first emission initializes; later writes came from this VM.
-            return
-        }
+        if (preferencesLoaded) return
         preferencesLoaded = true
         userIso = p.iso
         userAperture = p.aperture
@@ -148,81 +218,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _exposureMode = p.exposureMode
         _meteringMode = p.meteringMode
         liveMetering = p.isLiveMetering
+        continuous = p.isLiveMetering
         thirdStopIncrements = p.useThirdStops
         _calOffset = p.calibrationOffset
         _kConstant = p.kConstant
         _hapticFeedback = p.hapticsEnabled
-        _accentColor = AccentColor.entries.firstOrNull { it.name == p.accentName } ?: AccentColor.AMBER
+        _accentColor = AccentColor.entries.firstOrNull { it.name == p.accentName }
+            ?: AccentColor.AMBER
     }
 
     private var preferencesLoaded = false
-
-    // ---- Derived exposure chain (mirrors the reference model) ----
-
-    private val kShift: Double get() = ExposureSolver.calibrationShift(kConstant)
-
-    /** Scene EV with calibration, ND and K-constant applied (before MULTI aggregation). */
-    val baseEv: Double?
-        get() = engineSceneEv?.let { it + calOffset - ndFilter + kShift }
-
-    /** Per-spot display EVs (engine raw EVs shifted by the same chain as [baseEv]). */
-    val spotDisplayEvs: List<Double>
-        get() = engineSpotEvs.map { it + calOffset - ndFilter + kShift }
-
-    val multiActive: Boolean get() = meteringMode == MeteringMode.MULTI
-
-    private val aggOffset: Double
-        get() {
-            if (!multiActive || engineSpotEvs.isEmpty()) return 0.0
-            val shifted = spotDisplayEvs.filter { it.isFinite() }
-            if (shifted.isEmpty()) return 0.0
-            val value = when (spotAggregation) {
-                SpotAggregation.AVG -> shifted.average()
-                SpotAggregation.HIGH -> shifted.max()
-                SpotAggregation.LOW -> shifted.min()
-            }
-            return value - (baseEv ?: return 0.0)
-        }
-
-    val ev100: Double?
-        get() = baseEv?.plus(aggOffset)
-
-    val spread: Double
-        get() {
-            val shifted = spotDisplayEvs.filter { it.isFinite() }
-            return if (shifted.size > 1) shifted.max() - shifted.min() else 0.0
-        }
-
-    private val evEff: Double? get() = ev100?.minus(expComp)
-
-    private val evIso: Double? get() = evEff?.let { ExposureSolver.evAtIso(it, userIso) }
-
-    val solverResult: SolverResult?
-        get() = evIso?.let { ExposureSolver.solve(exposureMode, userAperture, userShutter, it) }
-
-    val needle: Double get() = solverResult?.let { ExposureSolver.needle(it.diff) } ?: 0.0
-
-    val matched: Boolean get() = solverResult?.let { ExposureSolver.isMatched(it.diff) } == true
-
-    val luxText: String
-        get() = ev100?.let { ExposureSolver.approxLux(it, ndFilter).toInt().toString() } ?: "--"
 
     // ---- Camera ----
 
     fun startCamera(lifecycleOwner: LifecycleOwner, previewView: PreviewView) {
         cameraManager.start(lifecycleOwner, previewView, ::onEngineState)
-        // The analyzer exists synchronously; push the current state so the first frames
-        // already meter in the persisted mode instead of the analyzer default.
         cameraManager.analyzer?.let { engine ->
             engine.meteringMode = meteringMode
-            engine.hold = aeHold
-            engine.live = effectiveLive
+            engine.live = continuous
         }
     }
 
-    /** Spot positions in analysis-frame coordinates, pushed by the view layer. */
     fun pushEngineSpots(frameSpots: List<Pair<Float, Float>>) {
-        cameraManager.analyzer?.spots = frameSpots.map { com.lumeter.camera.MeterSpot(it.first, it.second) }
+        cameraManager.analyzer?.spots =
+            frameSpots.map { MeterSpot(it.first, it.second) }
     }
 
     private var lastEmitNanos = 0L
@@ -234,12 +253,44 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         state.reading?.let {
             engineSceneEv = it.sceneEv100
             engineRawLuma = it.rawLuma
-        } ?: run { engineSceneEv = engineSceneEv }
+            engineClipped = it.clippedFraction
+        }
         engineSpotEvs = state.spotEvs
         aeConverged = state.aeConverged
         analysisWidth = state.analysisWidth
         analysisHeight = state.analysisHeight
         rotationDegrees = state.rotationDegrees
+
+        val ev = sceneEv
+        if (continuous) {
+            if (ev != null) {
+                // Solve hysteresis: small jitters never move the adopted center.
+                lastAdoptedEv = ExposureEngine.adoptEv(lastAdoptedEv, ev)
+                liveReading = buildReading(lastAdoptedEv)
+            } else {
+                liveReading = buildReading(null)
+            }
+        } else if (measuring && ev != null && state.reading != null) {
+            lastAdoptedEv = ev
+            frozenReading = buildReading(ev)
+            measuring = false
+        }
+    }
+
+    private fun buildReading(ev: Double?): MeterReading {
+        val reason = when {
+            ev == null -> ReadingInvalidReason.NO_SIGNAL
+            engineRawLuma > 0.97 || engineClipped > 0.5 -> ReadingInvalidReason.CLIPPED
+            engineRawLuma < 1e-4 -> ReadingInvalidReason.TOO_DARK
+            else -> null
+        }
+        return MeterReading(
+            ev100 = ev ?: 0.0,
+            valid = reason == null,
+            reason = reason,
+            timestampMs = System.currentTimeMillis(),
+            clippedFraction = engineClipped,
+        )
     }
 
     // ---- Actions ----
@@ -259,23 +310,51 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun cycleNdFilter() {
-        val next = ExposureSolver.ND_FILTERS
-            .firstOrNull { it > ndFilter } ?: ExposureSolver.ND_FILTERS.first()
+        val next = ExposureSolver.ND_FILTERS.firstOrNull { it > ndFilter }
+            ?: ExposureSolver.ND_FILTERS.first()
         ndFilter = next
     }
 
-    /** One stable reading while paused, then freeze again. */
-    fun singleShot() {
-        cameraManager.analyzer?.oneShot = true
+    fun toggleContinuous() {
+        if (continuous) {
+            continuous = false
+            frozenReading = liveReading
+        } else {
+            continuous = true
+            measuring = false
+        }
+        cameraManager.analyzer?.live = continuous
     }
 
-    fun toggleAeHold() {
-        aeHold = !aeHold
-        cameraManager.analyzer?.hold = aeHold
+    /**
+     * Main action button. HELD mode: take exactly one fresh stable reading.
+     * LIVE mode: force the solve to re-center on the next incoming reading.
+     */
+    fun measureNow() {
+        if (continuous) {
+            // LIVE: force the solve to re-center on the very next reading.
+            lastAdoptedEv = null
+            return
+        }
+        measuring = true
+        frozenReading = null
+        cameraManager.analyzer?.oneShot = true
+        viewModelScope.launch {
+            delay(MEASURE_TIMEOUT_MS)
+            if (measuring) {
+                measuring = false
+                if (frozenReading == null) {
+                    frozenReading = buildReading(sceneEv)
+                }
+            }
+        }
     }
 
     fun setExposureMode(mode: ExposureMode) {
+        val carried = ExposureEngine.carryOver(currentState(), exposureResult, mode)
         _exposureMode = mode
+        userAperture = carried.aperture
+        userShutter = carried.shutter
         when (mode) {
             ExposureMode.APERTURE_PRIORITY ->
                 if (_activeField == ActiveField.SHUTTER) _activeField = ActiveField.APERTURE
@@ -314,9 +393,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         expComp = (expComp + delta).coerceIn(-3.0, 3.0)
     }
 
+    // The settings switch only decides the startup default.
     fun toggleLiveMetering() {
         liveMetering = !liveMetering
-        cameraManager.analyzer?.live = effectiveLive
+        continuous = liveMetering
+        cameraManager.analyzer?.live = continuous
         viewModelScope.launch { runCatching { prefs.setLiveMetering(liveMetering) } }
     }
 
@@ -324,22 +405,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         controlsExpanded = !controlsExpanded
     }
 
-    /** Bottom action button: pause live metering for this session, press again to resume. */
-    fun toggleMeterPause() {
-        meterPaused = !meterPaused
-        cameraManager.analyzer?.live = effectiveLive
-    }
-
     // Multi-spot
 
     fun addSpot(x: Float, y: Float, ev100: Double) {
         if (spots.size >= MAX_SPOTS) return
-        spots = spots + SpotMeasurement(
-            id = nextSpotId(),
-            x = x,
-            y = y,
-            ev100 = ev100,
-        )
+        spots = spots + SpotMeasurement(id = nextSpotId(), x = x, y = y, ev100 = ev100)
     }
 
     fun removeSpot(id: Long) {
@@ -405,7 +475,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { runCatching { prefs.setAccentColor(color.name) } }
     }
 
-
     // Calibration
 
     fun setCalOffset(offset: Double) {
@@ -438,9 +507,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         const val MAX_SPOTS = 12
+        private const val EMIT_INTERVAL_NS = 100_000_000L // 10 Hz
+        private const val MEASURE_TIMEOUT_MS = 5_000L
         private val spotIdCounter = java.util.concurrent.atomic.AtomicLong(1)
         private fun nextSpotId(): Long = spotIdCounter.getAndIncrement()
-        private const val EMIT_INTERVAL_NS = 100_000_000L // 10 Hz readout
 
         fun formatTimestamp(timestamp: Long): String {
             val now = System.currentTimeMillis()

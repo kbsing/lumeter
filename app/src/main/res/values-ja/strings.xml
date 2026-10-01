@@ -118,4 +118,7 @@
     <string name="language">言語</string>
     <string name="language_system">システム</string>
     <string name="collapse">折りたたむ</string>
+    <string name="too_bright">明るすぎ</string>
+    <string name="too_dark">暗すぎ</string>
+    <string name="scale_limit">段差の制限</string>
 </resources>

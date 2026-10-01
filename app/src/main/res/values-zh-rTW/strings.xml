@@ -118,4 +118,7 @@
     <string name="language">語言</string>
     <string name="language_system">跟隨系統</string>
     <string name="collapse">收起</string>
+    <string name="too_bright">過亮</string>
+    <string name="too_dark">過暗</string>
+    <string name="scale_limit">檔位限制</string>
 </resources>

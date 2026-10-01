@@ -83,10 +83,10 @@ fun TopBar(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             onClick = vm::cycleNdFilter,
         )
         CompactToggle(
-            label = "HOLD",
-            sub = "AE-L",
-            on = vm.aeHold,
-            onClick = vm::toggleAeHold,
+            label = if (vm.continuous) "LIVE" else "HELD",
+            sub = "AE",
+            on = !vm.continuous,
+            onClick = vm::toggleContinuous,
         )
         Spacer(Modifier.weight(1f))
         IconEntry(Icons.Outlined.History, "history") { vm.navigateTo(AppPage.HISTORY) }

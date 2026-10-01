@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.lumeter.core.exposure.ExposureMode
+import com.lumeter.core.exposure.ReadingInvalidReason
 import com.lumeter.core.meter.MeteringMode
 import com.lumeter.ui.AppViewModel
 import com.lumeter.ui.common.FormatUtils
@@ -160,7 +161,7 @@ private fun ModeReticle(vm: AppViewModel) {
     // SPOT's reading IS the center, so refine the local brightness estimate with it.
     val local = if (mode == MeteringMode.SPOT) {
         val spotEv = vm.ev100
-        val base = vm.baseEv
+        val base = vm.sceneEv
         if (spotEv != null && base != null && vm.engineRawLuma > 0.0) {
             vm.engineRawLuma * 2.0.pow((spotEv - base).coerceIn(-6.0, 6.0))
         } else {
@@ -223,7 +224,7 @@ private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
 
     Box(Modifier.fillMaxSize()) {
         val engineEvs = vm.spotDisplayEvs
-        val base = vm.baseEv
+        val base = vm.sceneEv
         vm.spots.forEachIndexed { index, spot ->
             val spotKeyline = contrastOn(
                 run {
@@ -339,7 +340,9 @@ private fun SpotHandle(
 
 @Composable
 private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
-    val solver = vm.solverResult
+    val result = vm.exposureResult
+    val reading = vm.activeReading
+
     val rightLabel = when (vm.exposureMode) {
         ExposureMode.APERTURE_PRIORITY -> stringResource(R.string.shutter).uppercase()
         ExposureMode.SHUTTER_PRIORITY -> stringResource(R.string.aperture).uppercase()
@@ -347,16 +350,24 @@ private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
     }
     val rightValue = when (vm.exposureMode) {
         ExposureMode.APERTURE_PRIORITY ->
-            solver?.let { FormatUtils.shutter(it.shutterSnapped) } ?: "--"
+            result.solvedShutter?.let { FormatUtils.shutter(it) } ?: "--"
         ExposureMode.SHUTTER_PRIORITY ->
-            solver?.let { FormatUtils.aperture(it.apertureSnapped) } ?: "--"
+            result.solvedAperture?.let { FormatUtils.aperture(it) } ?: "--"
         ExposureMode.MANUAL ->
-            solver?.let { FormatUtils.signed(it.diff) } ?: "±0.0"
+            result.stops?.let { FormatUtils.signed(it) } ?: "--"
     }
     val rightColor = when (vm.exposureMode) {
         ExposureMode.MANUAL -> if (vm.matched) ColorAccent else ColorInk
         else -> ColorAccent
     }
+    // Reading-invalid override replaces the EV number with a diagnosis.
+    val evText = when (reading?.reason) {
+        ReadingInvalidReason.CLIPPED -> stringResource(R.string.too_bright).uppercase()
+        ReadingInvalidReason.TOO_DARK -> stringResource(R.string.too_dark).uppercase()
+        ReadingInvalidReason.NO_SIGNAL -> "--.-"
+        else -> FormatUtils.evText(vm.ev100)
+    }
+    val evDim = reading?.valid == false
 
     Column(
         modifier
@@ -376,13 +387,20 @@ private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
                     color = ColorDim,
                 )
                 Text(
-                    FormatUtils.evText(vm.ev100),
-                    style = DisplayLarge.copy(fontSize = 58.sp, lineHeight = 50.sp),
-                    color = ColorInk,
+                    evText,
+                    style = if (evDim) LabelTiny.copy(fontSize = 20.sp) else DisplayLarge.copy(
+                        fontSize = 58.sp,
+                        lineHeight = 50.sp,
+                    ),
+                    color = if (evDim) ColorAccent else ColorInk,
+                    modifier = if (evDim) Modifier.padding(top = 14.dp, bottom = 6.dp) else Modifier,
                 )
             }
             Spacer(Modifier.weight(1f))
-            Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(bottom = 6.dp)) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.padding(bottom = 6.dp),
+            ) {
                 Text(rightLabel, style = LabelTiny, color = ColorDim)
                 Text(rightValue, style = DisplayMedium.copy(fontSize = 34.sp, lineHeight = 34.sp), color = rightColor)
             }
@@ -394,6 +412,25 @@ private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .padding(top = 2.dp),
         )
+        // Attribution + first suggestion, one quiet line under the scale.
+        val causes = result.causes
+        val hint = buildString {
+            if (causes != null && causes.quantized && result.stops == 0.0) {
+                append(
+                    stringResource(R.string.scale_limit) +
+                        " " + FormatUtils.signed(causes.quantizedResidual),
+                )
+            }
+            result.suggestions.firstOrNull()?.let { append("  \u00b7  " + it.detail) }
+        }
+        if (hint.isNotBlank()) {
+            Text(
+                hint.trim(),
+                style = LabelTiny.copy(fontSize = 9.sp),
+                color = ColorDim,
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
     }
 }
 
