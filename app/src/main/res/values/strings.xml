@@ -121,4 +121,6 @@
     <string name="too_bright">Too bright</string>
     <string name="too_dark">Too dark</string>
     <string name="scale_limit">Scale limit</string>
+    <string name="delete_confirm">Delete this reading?</string>
+    <string name="cancel">Cancel</string>
 </resources>

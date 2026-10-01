@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,27 +41,59 @@ fun MeterPage(appViewModel: AppViewModel = viewModel()) {
         hasPermission = granted
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(ColorBody),
-    ) {
-        TopBar(appViewModel)
-        if (hasPermission) {
-            Viewfinder(
-                appViewModel,
-                Modifier.weight(1f),
-            )
-            BottomControls(appViewModel)
-        } else {
-            androidx.compose.foundation.layout.Box(
-                Modifier
-                    .fillMaxSize()
-                    .weight(1f),
-            ) {
-                CameraPermissionScreen(
-                    onRequestPermission = { launcher.launch(Manifest.permission.CAMERA) },
+    val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    if (landscape) {
+        // Landscape: finder on the left, controls in a side panel.
+        androidx.compose.foundation.layout.Row(
+            Modifier
+                .fillMaxSize()
+                .background(ColorBody),
+        ) {
+            androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                TopBar(appViewModel)
+                if (hasPermission) {
+                    Viewfinder(appViewModel, Modifier.weight(1f))
+                } else {
+                    androidx.compose.foundation.layout.Box(Modifier.weight(1f)) {
+                        CameraPermissionScreen(
+                            onRequestPermission = {
+                                launcher.launch(Manifest.permission.CAMERA)
+                            },
+                        )
+                    }
+                }
+            }
+            if (hasPermission) {
+                BottomControls(
+                    appViewModel,
+                    Modifier.width(360.dp),
                 )
+            }
+        }
+    } else {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(ColorBody),
+        ) {
+            TopBar(appViewModel)
+            if (hasPermission) {
+                Viewfinder(
+                    appViewModel,
+                    Modifier.weight(1f),
+                )
+                BottomControls(appViewModel)
+            } else {
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+                ) {
+                    CameraPermissionScreen(
+                        onRequestPermission = { launcher.launch(Manifest.permission.CAMERA) },
+                    )
+                }
             }
         }
     }

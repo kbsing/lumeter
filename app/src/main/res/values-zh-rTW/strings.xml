@@ -121,4 +121,6 @@
     <string name="too_bright">過亮</string>
     <string name="too_dark">過暗</string>
     <string name="scale_limit">檔位限制</string>
+    <string name="delete_confirm">刪除這條測光記錄？</string>
+    <string name="cancel">取消</string>
 </resources>

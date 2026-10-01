@@ -6,7 +6,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,46 +35,56 @@ fun HistoryPage(
     appViewModel: AppViewModel,
     onBack: () -> Unit,
 ) {
+    var pendingDelete by remember { mutableStateOf<Long?>(null) }
+    pendingDelete?.let { id ->
+        DeleteConfirmDialog(
+            onConfirm = {
+                appViewModel.deleteLogEntry(id)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null },
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(ColorBody)
             .padding(horizontal = 20.dp)
     ) {
-        // Header
-        Row(
+        // Header: back and stats pinned to the edges, the title centered on the screen.
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 48.dp, bottom = 24.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(top = 48.dp, bottom = 24.dp)
         ) {
             Box(
                 modifier = Modifier
+                    .align(Alignment.CenterStart)
                     .clip(RoundedCornerShape(6.dp))
                     .background(ColorPanel)
                     .clickable { onBack() }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Text(
-                    text = "← ${stringResource(R.string.back)}",
+                    text = "\u2190 ${stringResource(R.string.back)}",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = ColorDim,
                     letterSpacing = 0.5.sp
                 )
             }
-            
             Text(
                 text = stringResource(R.string.history).uppercase(),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = ColorInk,
-                letterSpacing = 2.sp
+                letterSpacing = 2.sp,
+                modifier = Modifier.align(Alignment.Center)
             )
-            
-            // Stats
-            Column(horizontalAlignment = Alignment.End) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
                 Text(
                     text = stringResource(R.string.readings),
                     fontSize = 9.sp,
@@ -83,7 +99,7 @@ fun HistoryPage(
                 )
             }
         }
-        
+
         // Content
         if (appViewModel.logEntries.isEmpty()) {
             Box(
@@ -105,7 +121,7 @@ fun HistoryPage(
                 items(appViewModel.logEntries, key = { it.id }) { entry ->
                     LogEntryCard(
                         entry = entry,
-                        onDelete = { appViewModel.deleteLogEntry(entry.id) }
+                        onDelete = { pendingDelete = entry.id }
                     )
                 }
             }
@@ -191,4 +207,26 @@ private fun LogEntryCard(
             )
         }
     }
+}
+
+@Composable
+private fun DeleteConfirmDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.delete)) },
+        text = { Text(stringResource(R.string.delete_confirm)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.delete), color = ColorDanger)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
 }

@@ -121,4 +121,6 @@
     <string name="too_bright">明るすぎ</string>
     <string name="too_dark">暗すぎ</string>
     <string name="scale_limit">段差の制限</string>
+    <string name="delete_confirm">この測光記録を削除しますか？</string>
+    <string name="cancel">キャンセル</string>
 </resources>

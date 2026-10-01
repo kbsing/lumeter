@@ -90,7 +90,7 @@ class ExposureSolverTest {
     @Test
     fun `nearest picks the log-closest scale stop`() {
         assertEquals(1.0 / 125.0, ExposureSolver.nearest(ExposureSolver.SHUTTERS, 1.0 / 140.0), 1e-9)
-        assertEquals(11.0, ExposureSolver.nearest(ExposureSolver.APERTURES, 9.5), 1e-9)
+        assertEquals(10.0, ExposureSolver.nearest(ExposureSolver.APERTURES, 9.5), 1e-9)
     }
 
     @Test

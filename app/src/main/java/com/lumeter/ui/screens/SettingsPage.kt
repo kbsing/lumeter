@@ -46,15 +46,15 @@ fun SettingsPage(
             .padding(horizontal = 20.dp)
     ) {
         // Header
-        Row(
+        // Header: back pinned left, title centered on the screen.
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 48.dp, bottom = 24.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(top = 48.dp, bottom = 24.dp)
         ) {
             Box(
                 modifier = Modifier
+                    .align(Alignment.CenterStart)
                     .clip(RoundedCornerShape(6.dp))
                     .background(ColorPanel)
                     .clickable { onBack() }
@@ -74,10 +74,9 @@ fun SettingsPage(
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = ColorInk,
-                letterSpacing = 2.sp
+                letterSpacing = 2.sp,
+                modifier = Modifier.align(Alignment.Center)
             )
-            
-            Spacer(Modifier.width(80.dp))
         }
         
         Column(
