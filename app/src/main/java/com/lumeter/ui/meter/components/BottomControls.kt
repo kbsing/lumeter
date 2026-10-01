@@ -324,8 +324,13 @@ private fun ExpandedPanel(vm: AppViewModel) {
                     },
                 contentAlignment = Alignment.Center,
             ) {
+                // ‖ freezes the live stream, ◉ takes a reading while HELD, ● while measuring.
                 Text(
-                    if (vm.measuring) "\u25CF" else "\u25C9",
+                    when {
+                        vm.continuous -> "\u2016"
+                        vm.measuring -> "\u25CF"
+                        else -> "\u25C9"
+                    },
                     color = if (vm.measuring) ColorAccent else ColorInk,
                     fontSize = 20.sp,
                 )
@@ -780,6 +785,7 @@ fun ActionRail(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             .padding(vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // Measure key: ‖ freezes LIVE, ◉ takes one reading while HELD, ● while measuring.
         Box(
             Modifier
                 .size(44.dp)
@@ -790,12 +796,17 @@ fun ActionRail(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                if (vm.measuring) "\u25CF" else "\u25C9",
+                when {
+                    vm.continuous -> "\u2016"
+                    vm.measuring -> "\u25CF"
+                    else -> "\u25C9"
+                },
                 color = if (vm.measuring) ColorAccent else ColorInk,
                 fontSize = 18.sp,
             )
         }
         Spacer(Modifier.weight(1f))
+        // Record button — the meter's "shutter": logs the current reading, flash feedback.
         Box(
             Modifier
                 .size(64.dp)
@@ -807,6 +818,12 @@ fun ActionRail(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
         ) {
             Text("\u25CE", color = ColorAccent, fontSize = 26.sp)
         }
+        Text(
+            stringResource(R.string.log_reading).uppercase(),
+            style = LabelTiny.copy(fontSize = 8.sp, letterSpacing = 1.sp),
+            color = ColorDim,
+            modifier = Modifier.padding(top = 2.dp),
+        )
         Spacer(Modifier.weight(1f))
         Text(
             "\u00B7 ${vm.logEntries.size} \u00B7",

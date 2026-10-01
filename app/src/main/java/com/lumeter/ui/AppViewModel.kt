@@ -340,13 +340,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Main action button. HELD mode: take exactly one fresh stable reading.
-     * LIVE mode: force the solve to re-center on the next incoming reading.
+     * Main action button. LIVE mode: freeze the stream — a session pause the AE
+     * toggle reverses (the old behavior of only resetting the solve hysteresis was
+     * invisible to the user). HELD mode: take exactly one fresh stable reading.
      */
     fun measureNow() {
         if (continuous) {
-            // LIVE: force the solve to re-center on the very next reading.
-            lastAdoptedEv = null
+            toggleContinuous()
             return
         }
         measuring = true
