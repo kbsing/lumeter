@@ -1,6 +1,8 @@
 package com.lumeter.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +45,7 @@ fun SettingsPage(
         modifier = Modifier
             .fillMaxSize()
             .background(ColorBody)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
     ) {
         // Header
@@ -168,7 +171,7 @@ fun SettingsPage(
                 )
             }
             
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(24.dp))
             
             // Version footer
             Text(

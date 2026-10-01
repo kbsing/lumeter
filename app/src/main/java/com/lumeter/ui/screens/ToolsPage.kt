@@ -159,22 +159,12 @@ private fun ReciprocityCard(film: FilmStock) {
     val stops = model.correctionStops(metered)
 
     ToolCard(title = stringResource(R.string.tool_reciprocity)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            times.forEach { t ->
-                val on = t == metered
-                Text(
-                    formatSeconds(t),
-                    fontSize = 11.sp,
-                    fontFamily = BarlowCondensed,
-                    color = if (on) ColorBody else ColorInk,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (on) ColorAccent else ColorBody)
-                        .clickable { metered = t }
-                        .padding(horizontal = 9.dp, vertical = 6.dp),
-                )
-            }
-        }
+        ChipRow(
+            values = times,
+            selected = metered,
+            format = { formatSeconds(it) },
+            onSelect = { metered = it },
+        )
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
