@@ -95,7 +95,7 @@
     <string name="accent_colour">主题色</string>
     <string name="calibration_menu">校准</string>
     <string name="calibration_desc">传感器偏移和反射光常数。</string>
-    <string name="version">LUMEN MK·I — v0.7.0</string>
+    <string name="version">LUMEN MK·I — v0.7.1</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">琥珀</string>
@@ -175,4 +175,11 @@
     <string name="reference_hint">对准灰卡或可信的测光表,输入其真实 EV,将根据当前读数自动算出所选来源的偏移。</string>
     <string name="reference_apply">应用</string>
     <string name="reciprocity_short">RECIP</string>
+
+    <!-- v0.7.1: tool parameter labels -->
+    <string name="tool_metered_time">实测快门</string>
+    <string name="tool_gn">闪光指数(m,ISO 100)</string>
+    <string name="tool_distance">距离</string>
+    <string name="tool_focal">焦距</string>
+    <string name="tool_coc">弥散圆</string>
 </resources>

@@ -164,6 +164,7 @@ private fun ReciprocityCard(film: FilmStock) {
             selected = metered,
             format = { formatSeconds(it) },
             onSelect = { metered = it },
+            label = stringResource(R.string.tool_metered_time),
         )
         Row(
             Modifier.fillMaxWidth(),
@@ -218,12 +219,14 @@ private fun FlashCard(appViewModel: AppViewModel) {
             selected = guideNumber,
             format = { String.format(Locale.US, "GN %.0f", it) },
             onSelect = { guideNumber = it },
+            label = stringResource(R.string.tool_gn),
         )
         ChipRow(
             values = distances,
             selected = distance,
             format = { String.format(Locale.US, "%.1f m", it) },
             onSelect = { distance = it },
+            label = stringResource(R.string.tool_distance),
         )
         Row(
             Modifier.fillMaxWidth(),
@@ -267,24 +270,28 @@ private fun DepthOfFieldCard() {
             selected = focal,
             format = { String.format(Locale.US, "%.0f mm", it) },
             onSelect = { focal = it },
+            label = stringResource(R.string.tool_focal),
         )
         ChipRow(
             values = listOf(1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0),
             selected = aperture,
             format = { FormatUtils.aperture(it) },
             onSelect = { aperture = it },
+            label = stringResource(R.string.aperture),
         )
         ChipRow(
             values = listOf(1.0, 1.5, 2.0, 3.0, 5.0, 8.0, 12.0, 20.0),
             selected = distance,
             format = { String.format(Locale.US, "%.1f m", it) },
             onSelect = { distance = it },
+            label = stringResource(R.string.tool_distance),
         )
         ChipRow(
             values = DepthOfField.COC_PRESETS.values.toList(),
             selected = coc,
-            format = { String.format(Locale.US, "%.3f", it) },
+            format = { String.format(Locale.US, "%.3f mm", it) },
             onSelect = { coc = it },
+            label = stringResource(R.string.tool_coc),
         )
         Spacer(Modifier.height(6.dp))
         Row(
@@ -400,26 +407,37 @@ private fun ChipRow(
     selected: Double,
     format: (Double) -> String,
     onSelect: (Double) -> Unit,
+    label: String? = null,
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        values.forEach { value ->
-            val on = value == selected
+    Column {
+        if (label != null) {
             Text(
-                format(value),
-                fontSize = 11.sp,
-                fontFamily = BarlowCondensed,
-                color = if (on) ColorBody else ColorInk,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(if (on) ColorAccent else ColorBody)
-                    .clickable { onSelect(value) }
-                    .padding(horizontal = 9.dp, vertical = 6.dp),
+                label.uppercase(),
+                style = com.lumeter.ui.theme.LabelTiny.copy(fontSize = 8.sp),
+                color = ColorDim,
+                modifier = Modifier.padding(start = 2.dp, bottom = 3.dp),
             )
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            values.forEach { value ->
+                val on = value == selected
+                Text(
+                    format(value),
+                    fontSize = 11.sp,
+                    fontFamily = BarlowCondensed,
+                    color = if (on) ColorBody else ColorInk,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (on) ColorAccent else ColorBody)
+                        .clickable { onSelect(value) }
+                        .padding(horizontal = 9.dp, vertical = 6.dp),
+                )
+            }
         }
     }
 }

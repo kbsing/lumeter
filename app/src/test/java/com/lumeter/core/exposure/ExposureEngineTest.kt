@@ -239,6 +239,18 @@ class ExposureEngineTest {
     private val triX = com.lumeter.core.tools.Reciprocity.fromStopAt(1.0, 10.0)
 
     @Test
+    fun `long shutter tail stays within half stops`() {
+        // Past 30s the scale is ~third stops; a full-stop jump makes reciprocity
+        // corrections land far off any mark.
+        val longs = ExposureSolver.SHUTTERS.filter { it >= 30.0 }
+        assertTrue(longs.size >= 10)
+        for (i in 1 until longs.size) {
+            val gap = kotlin.math.log2(longs[i] / longs[i - 1])
+            assertTrue("gap ${longs[i - 1]}->$${longs[i]} = $gap stops", gap <= 0.5)
+        }
+    }
+
+    @Test
     fun `A mode extends the solved shutter by the reciprocity correction`() {
         // EV100 3, f/11, ISO 100 → ideal ≈ 15s; Tri-X (+1 stop at 10s) demands ~34s,
         // which snaps to 30s. The needle keeps only the snap residual.

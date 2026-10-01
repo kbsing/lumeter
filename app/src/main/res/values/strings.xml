@@ -95,7 +95,7 @@
     <string name="accent_colour">Accent colour</string>
     <string name="calibration_menu">Calibration</string>
     <string name="calibration_desc">Sensor offset and reflected-light constant.</string>
-    <string name="version">LUMEN MK·I — v0.7.0</string>
+    <string name="version">LUMEN MK·I — v0.7.1</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">Amber</string>
@@ -175,4 +175,11 @@
     <string name="reference_hint">Aim at a gray card or a trusted meter, enter its true EV, and the offset for the selected source is derived from the live reading.</string>
     <string name="reference_apply">APPLY</string>
     <string name="reciprocity_short">RECIP</string>
+
+    <!-- v0.7.1: tool parameter labels -->
+    <string name="tool_metered_time">Metered time</string>
+    <string name="tool_gn">Guide number (m @ ISO 100)</string>
+    <string name="tool_distance">Distance</string>
+    <string name="tool_focal">Focal length</string>
+    <string name="tool_coc">Circle of confusion</string>
 </resources>
