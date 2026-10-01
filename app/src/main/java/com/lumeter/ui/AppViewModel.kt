@@ -340,15 +340,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Main action button. LIVE mode: freeze the stream — a session pause the AE
-     * toggle reverses (the old behavior of only resetting the solve hysteresis was
-     * invisible to the user). HELD mode: take exactly one fresh stable reading.
+     * Long-press on the main button while paused: take exactly one fresh stable
+     * reading into the frozen display, without resuming the stream. A plain tap on
+     * the button is pause/resume and goes through [toggleContinuous] directly.
      */
     fun measureNow() {
-        if (continuous) {
-            toggleContinuous()
-            return
-        }
+        if (continuous) return
         measuring = true
         frozenReading = null
         cameraManager.analyzer?.oneShot = true

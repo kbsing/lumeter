@@ -5,9 +5,11 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -92,6 +94,7 @@ fun BottomControls(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ExpandedPanel(vm: AppViewModel) {
     val haptics = LocalHapticFeedback.current
@@ -318,18 +321,18 @@ private fun ExpandedPanel(vm: AppViewModel) {
                     .clip(CircleShape)
                     .background(ColorInk.copy(alpha = 0.08f))
                     .border(1.5.dp, ColorInk.copy(alpha = 0.8f), CircleShape)
-                    .clickable {
-                        tick()
-                        vm.measureNow()
-                    },
+                    .combinedClickable(
+                        onClick = { tick(); vm.toggleContinuous() },
+                        onLongClick = { tick(); vm.measureNow() },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
-                // ‖ freezes the live stream, ◉ takes a reading while HELD, ● while measuring.
+                // ‖ pauses live metering, ▷ resumes, ● while a long-press measurement runs.
                 Text(
                     when {
-                        vm.continuous -> "\u2016"
                         vm.measuring -> "\u25CF"
-                        else -> "\u25C9"
+                        vm.continuous -> "\u2016"
+                        else -> "\u25B7"
                     },
                     color = if (vm.measuring) ColorAccent else ColorInk,
                     fontSize = 20.sp,
@@ -771,6 +774,7 @@ private fun LandscapeParamCard(
  * Landscape right edge: measure key on top, the big record button centered, log count
  * at the bottom — the reference's PAUSE / shutter / LOG column.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ActionRail(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
     val vm = appViewModel
@@ -785,21 +789,24 @@ fun ActionRail(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             .padding(vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Measure key: ‖ freezes LIVE, ◉ takes one reading while HELD, ● while measuring.
+        // ‖ pauses live metering, ▷ resumes, long-press takes one fresh reading.
         Box(
             Modifier
                 .size(44.dp)
                 .clip(CircleShape)
                 .background(ColorInk.copy(alpha = 0.08f))
                 .border(1.5.dp, ColorInk.copy(alpha = 0.8f), CircleShape)
-                .clickable { tick(); vm.measureNow() },
+                .combinedClickable(
+                    onClick = { tick(); vm.toggleContinuous() },
+                    onLongClick = { tick(); vm.measureNow() },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 when {
-                    vm.continuous -> "\u2016"
                     vm.measuring -> "\u25CF"
-                    else -> "\u25C9"
+                    vm.continuous -> "\u2016"
+                    else -> "\u25B7"
                 },
                 color = if (vm.measuring) ColorAccent else ColorInk,
                 fontSize = 18.sp,
