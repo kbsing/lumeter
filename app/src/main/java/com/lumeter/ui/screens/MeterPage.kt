@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
@@ -44,16 +46,27 @@ fun MeterPage(appViewModel: AppViewModel = viewModel()) {
     val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
     if (landscape) {
-        // Landscape: finder on the left, controls in a side panel.
-        androidx.compose.foundation.layout.Row(
+        // Landscape: top bar across, then finder | vertical EV rail | side panel.
+        androidx.compose.foundation.layout.Column(
             Modifier
                 .fillMaxSize()
                 .background(ColorBody),
         ) {
-            androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                TopBar(appViewModel)
+            TopBar(appViewModel)
+            androidx.compose.foundation.layout.Row(Modifier.weight(1f)) {
                 if (hasPermission) {
                     Viewfinder(appViewModel, Modifier.weight(1f))
+                    com.lumeter.ui.meter.components.VerticalExposureScale(
+                        needle = appViewModel.needle,
+                        matched = appViewModel.matched,
+                        modifier = Modifier
+                            .align(Alignment.CenterVertically)
+                            .padding(end = 4.dp),
+                    )
+                    BottomControls(
+                        appViewModel,
+                        Modifier.width(340.dp),
+                    )
                 } else {
                     androidx.compose.foundation.layout.Box(Modifier.weight(1f)) {
                         CameraPermissionScreen(
@@ -63,12 +76,6 @@ fun MeterPage(appViewModel: AppViewModel = viewModel()) {
                         )
                     }
                 }
-            }
-            if (hasPermission) {
-                BottomControls(
-                    appViewModel,
-                    Modifier.width(360.dp),
-                )
             }
         }
     } else {

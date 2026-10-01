@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lumeter.R
 import com.lumeter.core.exposure.ExposureMode
+import com.lumeter.core.exposure.ExposureEngine
 import com.lumeter.core.exposure.ExposureSolver
 import com.lumeter.data.ActiveField
 import com.lumeter.ui.AppViewModel
@@ -207,6 +208,33 @@ private fun ExpandedPanel(vm: AppViewModel) {
                 modifier = Modifier.weight(1f),
                 onClick = { tick(); vm.setActiveField(ActiveField.SHUTTER) },
             )
+        }
+
+        // Equivalent exposure pairs: trade DOF against hand-hold, one tap to apply.
+        val pairs = vm.equivalentPairs
+        if (pairs.isNotEmpty()) {
+            androidx.compose.foundation.lazy.LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(bottom = 10.dp),
+            ) {
+                items(pairs.size) { index ->
+                    val (ap, sh) = pairs[index]
+                    val active = vm.exposureMode == ExposureMode.MANUAL &&
+                        kotlin.math.abs(ap - vm.userAperture) < 0.01
+                    Text(
+                        "f/${ExposureEngine.formatAperture(ap)}  ${FormatUtils.shutter(sh)}",
+                        fontSize = 11.sp,
+                        fontFamily = BarlowCondensed,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        color = if (active) ColorBody else ColorInk,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (active) ColorAccent else ColorBody)
+                            .clickable { tick(); vm.applyEquivalentPair(ap, sh) }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(10.dp))

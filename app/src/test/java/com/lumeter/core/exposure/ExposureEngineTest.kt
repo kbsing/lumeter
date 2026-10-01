@@ -178,6 +178,41 @@ class ExposureEngineTest {
         assertNull(r.causes)
     }
 
+    // Equivalent pairs: every pair delivers the same EV within a third stop,
+    // centered around the user's aperture.
+    @Test
+    fun `equivalent pairs share one effective exposure`() {
+        val state = ExposureState(ExposureMode.MANUAL, 5.6, 1.0 / 125.0, 100)
+        val pairs = ExposureEngine.equivalentPairs(state, reading(12.0), 5.6)
+        assertTrue(pairs.isNotEmpty())
+        // The shutter scale is full-stop, so snapping can leave up to half a stop
+        // of residual on the pairs — that bound is what the UI actually promises.
+        pairs.forEach { (ap, sh) ->
+            val e = ExposureEngine.av(ap) + ExposureEngine.tv(sh)
+            assertEquals(12.0, e, 0.5 + 1e-9)
+        }
+        // The center pair (current aperture) carries at most a third stop.
+        val center = pairs.first { kotlin.math.abs(it.first - 5.6) < 0.01 }
+        assertEquals(
+            12.0,
+            ExposureEngine.av(center.first) + ExposureEngine.tv(center.second),
+            1.0 / 3.0 + 1e-9,
+        )
+        // Centered: the current aperture is present and pairs span +/- stops.
+        assertTrue(pairs.any { kotlin.math.abs(it.first - 5.6) < 0.01 })
+        assertTrue(pairs.first().first < 5.6 && pairs.last().first > 5.6)
+    }
+
+    @Test
+    fun `equivalent pairs empty without a reading`() {
+        val pairs = ExposureEngine.equivalentPairs(
+            ExposureState(ExposureMode.MANUAL, 5.6, 1.0 / 125.0, 100),
+            null,
+            5.6,
+        )
+        assertTrue(pairs.isEmpty())
+    }
+
     @Test
     fun `dead zone reports zero`() {
         val r = ExposureEngine.evaluate(

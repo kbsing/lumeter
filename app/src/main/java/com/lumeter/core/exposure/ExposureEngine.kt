@@ -180,6 +180,36 @@ object ExposureEngine {
         return list
     }
 
+    /**
+     * Equivalent exposure pairs around [centerAperture]: for every aperture within
+     * +/- [spanStops] stops, the shutter that delivers the same EV (snapped to the
+     * scale). For trading depth of field against hand-hold limits.
+     */
+    fun equivalentPairs(
+        state: ExposureState,
+        reading: MeterReading?,
+        centerAperture: Double,
+        spanStops: Int = 4,
+    ): List<Pair<Double, Double>> {
+        if (reading == null || !reading.valid) return emptyList()
+        val eReq = reading.ev100 + log2(state.iso / 100.0) - state.biasStops
+        val acc = accessoryOf(state)
+        val center = ExposureSolver.APERTURES.indices.minByOrNull {
+            abs(log2(ExposureSolver.APERTURES[it] / centerAperture))
+        } ?: return emptyList()
+        val half = spanStops * 3 // third-stop indices
+        return ((center - half).coerceAtLeast(0)..(center + half)
+            .coerceAtMost(ExposureSolver.APERTURES.lastIndex))
+            .mapNotNull { i ->
+                val aperture = ExposureSolver.APERTURES[i]
+                val t = 2.0.pow(-(eReq - av(aperture) - acc))
+                aperture to nearest(ExposureSolver.SHUTTERS, t)
+            }
+    }
+
+    private fun accessoryOf(state: ExposureState): Double =
+        state.ndStops + state.teleStops + 2 * log2(1 + state.magnification)
+
     fun nearest(items: List<Double>, target: Double): Double =
         items.minByOrNull { abs(log2(it / target)) } ?: items.first()
 

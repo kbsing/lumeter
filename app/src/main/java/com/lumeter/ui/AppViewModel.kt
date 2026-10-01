@@ -193,6 +193,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val exposureResult: ExposureResult
         get() = ExposureEngine.evaluate(currentState(), activeReading)
 
+    /** Equivalent (aperture, shutter) pairs around the current aperture. */
+    val equivalentPairs: List<Pair<Double, Double>>
+        get() = ExposureEngine.equivalentPairs(currentState(), activeReading, userAperture)
+
+    /** Apply one equivalent pair explicitly: both become user values in M mode. */
+    fun applyEquivalentPair(aperture: Double, shutter: Double) {
+        _exposureMode = ExposureMode.MANUAL
+        userAperture = aperture
+        userShutter = shutter
+        if (_activeField == ActiveField.SHUTTER) _activeField = ActiveField.APERTURE
+        viewModelScope.launch { runCatching { prefs.setExposureMode(ExposureMode.MANUAL) } }
+    }
+
     val needle: Double get() = exposureResult.stops ?: 0.0
     val matched: Boolean
         get() = exposureResult.kind == ResultKind.OK && exposureResult.stops == 0.0

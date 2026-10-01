@@ -133,7 +133,12 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                 .padding(end = 12.dp, top = 10.dp),
         )
 
-        ReadoutPanel(vm, Modifier.align(Alignment.BottomCenter))
+        ReadoutPanel(
+            vm,
+            Modifier.align(Alignment.BottomCenter),
+            landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE,
+        )
 
         if (vm.flashKey > 0) {
             val alpha by animateFloatAsState(
@@ -339,7 +344,11 @@ private fun SpotHandle(
 }
 
 @Composable
-private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
+private fun ReadoutPanel(
+    vm: AppViewModel,
+    modifier: Modifier = Modifier,
+    landscape: Boolean = false,
+) {
     val result = vm.exposureResult
     val reading = vm.activeReading
 
@@ -405,13 +414,15 @@ private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
                 Text(rightValue, style = DisplayMedium.copy(fontSize = 34.sp, lineHeight = 34.sp), color = rightColor)
             }
         }
-        ExposureScaleCanvas(
-            needle = vm.needle,
-            matched = vm.matched,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 2.dp),
-        )
+        if (!landscape) {
+            ExposureScaleCanvas(
+                needle = vm.needle,
+                matched = vm.matched,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+            )
+        }
         // Attribution + first suggestion, one quiet line under the scale.
         val causes = result.causes
         val hint = buildString {
@@ -482,6 +493,73 @@ fun ExposureScaleCanvas(needle: Double, matched: Boolean, modifier: Modifier = M
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
         ) {
             listOf("−3", "−2", "−1", "0", "+1", "+2", "+3").forEachIndexed { i, label ->
+                Text(
+                    label,
+                    fontSize = 8.sp,
+                    color = if (i == 3 && matched) ColorAccent else ColorDim,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Landscape companion of the needle scale: a vertical rail beside the viewfinder,
+ * positive EV up, negative down, needle sweeping horizontally.
+ */
+@Composable
+fun VerticalExposureScale(
+    needle: Double,
+    matched: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val animated by animateFloatAsState(
+        targetValue = needle.toFloat(),
+        animationSpec = tween(150),
+        label = "needleV",
+    )
+    val accent = ColorAccent
+    Row(modifier) {
+        Canvas(
+            Modifier
+                .padding(top = 8.dp, bottom = 8.dp)
+                .height(220.dp)
+                .width(18.dp),
+        ) {
+            val tickCount = 25
+            val step = size.height / (tickCount - 1)
+            repeat(tickCount) { i ->
+                val long = i % 4 == 0
+                val w = if (long) 12.dp.toPx() else 7.dp.toPx()
+                // Top is +3: index 0 at the top.
+                drawLine(
+                    color = ColorInk.copy(alpha = if (long) 0.7f else 0.4f),
+                    start = Offset(0f, i * step),
+                    end = Offset(w, i * step),
+                    strokeWidth = 1.5f,
+                )
+            }
+            val y = ((3f - animated) / 6f) * size.height
+            drawLine(
+                color = accent.copy(alpha = 0.35f),
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = 4.dp.toPx(),
+            )
+            drawLine(
+                color = accent,
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = 1.5.dp.toPx(),
+            )
+        }
+        Column(
+            Modifier
+                .padding(top = 8.dp, bottom = 8.dp)
+                .height(220.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+        ) {
+            listOf("+3", "+2", "+1", "0", "\u22121", "\u22122", "\u22123").forEachIndexed { i, label ->
                 Text(
                     label,
                     fontSize = 8.sp,
