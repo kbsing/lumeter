@@ -99,12 +99,12 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     detectTapGestures { offset ->
-                        val x = (offset.x / size.width).coerceIn(0.02f, 0.98f)
-                        val y = (offset.y / size.height).coerceIn(0.02f, 0.98f)
-                        when (vm.meteringMode) {
-                            MeteringMode.MULTI -> vm.addSpot(x, y, vm.ev100 ?: 0.0)
-                            MeteringMode.SPOT -> vm.setSpotPos(x, y)
-                            else -> {}
+                        if (vm.meteringMode == MeteringMode.MULTI) {
+                            vm.addSpot(
+                                (offset.x / size.width).coerceIn(0.02f, 0.98f),
+                                (offset.y / size.height).coerceIn(0.02f, 0.98f),
+                                vm.ev100 ?: 0.0,
+                            )
                         }
                     }
                 },
@@ -112,7 +112,7 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
 
         ModeReticle(vm.meteringMode)
 
-        if (vm.meteringMode == MeteringMode.MULTI || vm.meteringMode == MeteringMode.SPOT) {
+        if (vm.meteringMode == MeteringMode.MULTI) {
             SpotLayer(vm, boxWidth, boxHeight)
             MultiSpotInfo(
                 vm,
@@ -150,7 +150,7 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
 
 @Composable
 private fun ModeReticle(mode: MeteringMode) {
-    if (mode == MeteringMode.MULTI || mode == MeteringMode.SPOT) return
+    if (mode == MeteringMode.MULTI) return
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val shape = when (mode) {
             MeteringMode.SPOT -> Modifier
@@ -177,11 +177,9 @@ private fun ModeReticle(mode: MeteringMode) {
 
 @Composable
 private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
-    val isMulti = vm.meteringMode == MeteringMode.MULTI
     // Push spot positions to the engine whenever geometry or any spot moves.
     LaunchedEffect(
         vm.spots,
-        vm.spotPos,
         vm.meteringMode,
         vm.analysisWidth,
         vm.analysisHeight,
@@ -198,21 +196,15 @@ private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
                 viewWidth = boxWidth.toInt(),
                 viewHeight = boxHeight.toInt(),
             )
-            val viewPoints = if (isMulti) {
-                vm.spots.map { it.x to it.y }
-            } else {
-                listOf(vm.spotPos)
-            }
             vm.pushEngineSpots(
-                viewPoints.map { (x, y) -> transform.screenToFrame(x * boxWidth, y * boxHeight) },
+                vm.spots.map { (x, y) -> transform.screenToFrame(x * boxWidth, y * boxHeight) },
             )
         }
     }
 
     Box(Modifier.fillMaxSize()) {
         val engineEvs = vm.spotDisplayEvs
-        if (isMulti) {
-            vm.spots.forEachIndexed { index, spot ->
+        vm.spots.forEachIndexed { index, spot ->
                 val ev = engineEvs.getOrNull(index)?.takeIf { it.isFinite() } ?: spot.ev100
                 SpotHandle(
                     x = spot.x * boxWidth,
@@ -223,18 +215,6 @@ private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
                     onDrag = { nx, ny -> vm.updateSpot(spot.id, nx / boxWidth, ny / boxHeight) },
                     onDelete = { vm.removeSpot(spot.id) },
                 )
-            }
-        } else {
-            val ev = engineEvs.firstOrNull()?.takeIf { it.isFinite() } ?: vm.ev100 ?: 0.0
-            SpotHandle(
-                x = vm.spotPos.first * boxWidth,
-                y = vm.spotPos.second * boxHeight,
-                boxWidth = boxWidth,
-                boxHeight = boxHeight,
-                label = FormatUtils.evText(ev),
-                onDrag = { nx, ny -> vm.setSpotPos(nx / boxWidth, ny / boxHeight) },
-                onDelete = null,
-            )
         }
     }
 }

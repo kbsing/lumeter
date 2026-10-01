@@ -86,10 +86,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // Multi-spot metering (normalized viewfinder coordinates)
     var spots by mutableStateOf<List<SpotMeasurement>>(emptyList())
         private set
-
-    /** Single metering point for SPOT mode, normalized viewfinder coordinates. */
-    var spotPos by mutableStateOf(0.5f to 0.5f)
-        private set
     private var _spotAggregation by mutableStateOf(SpotAggregation.AVG)
     val spotAggregation: SpotAggregation get() = _spotAggregation
 
@@ -351,10 +347,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 it
             }
         }
-    }
-
-    fun setSpotPos(x: Float, y: Float) {
-        spotPos = x.coerceIn(0.02f, 0.98f) to y.coerceIn(0.02f, 0.98f)
     }
 
     fun clearSpots() {

@@ -167,17 +167,7 @@ private fun FilmStockCard(
             )
             
             Text(
-                text = stringResource(
-                    when (film.reciprocityHint) {
-                        "reciprocity_portra" -> R.string.reciprocity_portra
-                        "reciprocity_hp5" -> R.string.reciprocity_hp5
-                        "reciprocity_velvia" -> R.string.reciprocity_velvia
-                        "reciprocity_trix" -> R.string.reciprocity_trix
-                        "reciprocity_cinestill" -> R.string.reciprocity_cinestill
-                        "reciprocity_delta" -> R.string.reciprocity_delta
-                        else -> R.string.reciprocity_portra
-                    }
-                ),
+                text = reciprocityText(film.reciprocityHint),
                 fontSize = 11.sp,
                 color = ColorDim
             )
@@ -190,4 +180,19 @@ private fun FilmStockCard(
             color = if (isSelected) ColorAccent else ColorInk
         )
     }
+}
+
+
+@Composable
+private fun reciprocityText(hint: String): String {
+    val id = when (hint) {
+        "reciprocity_portra" -> R.string.reciprocity_portra
+        "reciprocity_hp5" -> R.string.reciprocity_hp5
+        "reciprocity_velvia" -> R.string.reciprocity_velvia
+        "reciprocity_trix" -> R.string.reciprocity_trix
+        "reciprocity_cinestill" -> R.string.reciprocity_cinestill
+        "reciprocity_delta" -> R.string.reciprocity_delta
+        else -> 0
+    }
+    return if (id != 0) stringResource(id) else hint
 }

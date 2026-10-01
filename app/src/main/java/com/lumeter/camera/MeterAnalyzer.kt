@@ -116,14 +116,7 @@ class MeterAnalyzer(
                         spot ?: wide
                     }
                 }
-                MeteringMode.SPOT -> {
-                    val point = spots.firstOrNull()
-                    analyzer.regionStat(
-                        point?.frameU ?: 0.5f,
-                        point?.frameV ?: 0.5f,
-                        EvMath.SPOT_ROI_FRACTION,
-                    )
-                }
+                MeteringMode.SPOT -> analyzer.regionStat(0.5f, 0.5f, EvMath.SPOT_ROI_FRACTION)
                 MeteringMode.MULTI -> analyzer.regionStat(0.5f, 0.5f, 1.0f)
             }
 
