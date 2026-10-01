@@ -26,13 +26,19 @@ import java.util.concurrent.Executors
  * Owns the CameraX binding for metering: preview + YUV analysis, with per-frame
  * CaptureResult delivered through a Camera2Interop session callback paired by
  * SENSOR_TIMESTAMP. All measurement happens in [MeterAnalyzer].
+ *
+ * The Viewfinder rebuilds its PreviewView whenever the meter page re-enters
+ * composition (returning from a sub page), and re-attaching a surface provider to the
+ * existing Preview proved unreliable on this device (session stays, surface never
+ * becomes ready → black viewfinder). Instead every start() rebinds the session with a
+ * fresh Preview while the analysis use case and analyzer keep their state.
  */
 class CameraManager(private val context: Context) {
 
     private val resultStore = CaptureResultStore()
     private var provider: ProcessCameraProvider? = null
     private var executor: ExecutorService? = null
-    private var preview: Preview? = null
+    private var analysis: ImageAnalysis? = null
 
     var analyzer: MeterAnalyzer? = null
         private set
@@ -43,27 +49,21 @@ class CameraManager(private val context: Context) {
         previewView: PreviewView,
         onState: (MeterEngineState) -> Unit,
     ) {
-        // The Viewfinder rebuilds its PreviewView whenever the meter page re-enters
-        // composition (e.g. returning from Settings); always rebind the fresh surface.
-        preview?.setSurfaceProvider(previewView.surfaceProvider)
-        if (analyzer != null) return
-        val exec = Executors.newSingleThreadExecutor()
-        executor = exec
-        val meter = MeterAnalyzer(
-            onState = onState,
-            defaultAperture = 2.0f,
-            resultStore = resultStore,
-        )
-        analyzer = meter
+        if (analyzer == null) {
+            executor = Executors.newSingleThreadExecutor()
+            analyzer = MeterAnalyzer(
+                onState = onState,
+                defaultAperture = 2.0f,
+                resultStore = resultStore,
+            )
+        }
+        val meter = analyzer ?: return
+        val exec = executor ?: return
 
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
             val cameraProvider = future.get()
             provider = cameraProvider
-            val boundPreview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
-            preview = boundPreview
             val resolutionSelector = ResolutionSelector.Builder()
                 .setResolutionStrategy(
                     ResolutionStrategy(
@@ -72,31 +72,42 @@ class CameraManager(private val context: Context) {
                     ),
                 )
                 .build()
-            val analysisBuilder = ImageAnalysis.Builder()
+
+            // Keep the analysis use case across rebinds (same builder config), so the
+            // metering stream and the analyzer's state survive page switches.
+            val useCase = analysis ?: ImageAnalysis.Builder()
                 .setResolutionSelector(resolutionSelector)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
-            Camera2Interop.Extender(analysisBuilder).setSessionCaptureCallback(
-                object : CameraCaptureSession.CaptureCallback() {
-                    override fun onCaptureCompleted(
-                        session: CameraCaptureSession,
-                        request: CaptureRequest,
-                        result: TotalCaptureResult,
-                    ) {
-                        resultStore.offer(result)
+                .let { builder ->
+                    Camera2Interop.Extender(builder).setSessionCaptureCallback(
+                        object : CameraCaptureSession.CaptureCallback() {
+                            override fun onCaptureCompleted(
+                                session: CameraCaptureSession,
+                                request: CaptureRequest,
+                                result: TotalCaptureResult,
+                            ) {
+                                resultStore.offer(result)
+                            }
+                        },
+                    )
+                    builder.build().also { built ->
+                        built.setAnalyzer(exec, meter)
+                        analysis = built
                     }
-                },
-            )
-            val analysis = analysisBuilder.build()
-                .also { it.setAnalyzer(exec, meter) }
+                }
+
+            val freshPreview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
 
             runCatching {
                 cameraProvider.unbindAll()
                 val camera = cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
-                    boundPreview,
-                    analysis,
+                    freshPreview,
+                    useCase,
                 )
                 meter.defaultAperture = backCameraAperture(camera)
             }
@@ -105,10 +116,11 @@ class CameraManager(private val context: Context) {
 
     fun stop() {
         runCatching { provider?.unbindAll() }
-        preview = null
         resultStore.clear()
         executor?.shutdown()
         analyzer = null
+        analysis = null
+        provider = null
     }
 
     @OptIn(ExperimentalCamera2Interop::class)

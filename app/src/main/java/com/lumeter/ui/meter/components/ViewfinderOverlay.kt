@@ -288,6 +288,11 @@ private fun SpotHandle(
     onDrag: (Float, Float) -> Unit,
     onTap: (() -> Unit)?,
 ) {
+    // Keep the gesture lambdas reading the latest position: the pointerInput(Unit)
+    // block runs once, so closures would otherwise capture the initial coordinates.
+    val currentX by androidx.compose.runtime.rememberUpdatedState(x)
+    val currentY by androidx.compose.runtime.rememberUpdatedState(y)
+    val currentOnDrag by androidx.compose.runtime.rememberUpdatedState(onDrag)
     Box(
         Modifier
             .offset {
@@ -305,9 +310,9 @@ private fun SpotHandle(
                 .pointerInput(Unit) {
                     detectDragGestures { change, amount ->
                         change.consume()
-                        onDrag(
-                            (x + amount.x).coerceIn(8f, boxWidth - 8f),
-                            (y + amount.y).coerceIn(8f, boxHeight - 8f),
+                        currentOnDrag(
+                            (currentX + amount.x).coerceIn(8f, boxWidth - 8f),
+                            (currentY + amount.y).coerceIn(8f, boxHeight - 8f),
                         )
                     }
                 }
