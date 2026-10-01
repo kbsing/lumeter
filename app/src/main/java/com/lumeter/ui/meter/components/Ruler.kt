@@ -139,7 +139,7 @@ object RulerLabels {
     fun iso(iso: Int): String = iso.toString()
 
     fun aperture(aperture: Double): String =
-        if (aperture < 1.05) {
+        if (aperture < 0.99) {
             "0.95"
         } else if (aperture >= 10.0 || kotlin.math.abs(aperture - aperture.toInt()) < 0.01) {
             aperture.toInt().toString()
