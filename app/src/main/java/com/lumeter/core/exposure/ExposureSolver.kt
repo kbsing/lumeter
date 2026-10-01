@@ -33,7 +33,7 @@ object ExposureSolver {
 
     /** Reference scale stops (full-stop camera conventions from the design). */
     val ISOS = listOf(50, 100, 200, 400, 800, 1600, 3200, 6400)
-    val APERTURES = listOf(1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0)
+    val APERTURES = listOf(0.95, 1.0, 1.2, 1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0)
     val SHUTTERS = listOf(
         1.0 / 2000.0, 1.0 / 1000.0, 1.0 / 500.0, 1.0 / 250.0, 1.0 / 125.0,
         1.0 / 60.0, 1.0 / 30.0, 1.0 / 15.0, 1.0 / 8.0, 1.0 / 4.0,

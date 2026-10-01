@@ -58,6 +58,7 @@ import com.lumeter.ui.theme.LabelTiny
 import androidx.compose.ui.res.stringResource
 import com.lumeter.R
 import com.lumeter.ui.theme.LumenPalette
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
@@ -110,7 +111,7 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                 },
         )
 
-        ModeReticle(vm.meteringMode)
+        ModeReticle(vm)
 
         if (vm.meteringMode == MeteringMode.MULTI) {
             SpotLayer(vm, boxWidth, boxHeight)
@@ -148,20 +149,38 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
     }
 }
 
+/** Line color that stays legible on the given linear luma (auto-inverted). */
+private fun contrastOn(luma: Double): Color =
+    if (luma > 0.30) Color(0xD910100E) else Color(0xB3ECE8DF)
+
 @Composable
-private fun ModeReticle(mode: MeteringMode) {
+private fun ModeReticle(vm: AppViewModel) {
+    val mode = vm.meteringMode
     if (mode == MeteringMode.MULTI) return
+    // SPOT's reading IS the center, so refine the local brightness estimate with it.
+    val local = if (mode == MeteringMode.SPOT) {
+        val spotEv = vm.ev100
+        val base = vm.baseEv
+        if (spotEv != null && base != null && vm.engineRawLuma > 0.0) {
+            vm.engineRawLuma * 2.0.pow((spotEv - base).coerceIn(-6.0, 6.0))
+        } else {
+            vm.engineRawLuma
+        }
+    } else {
+        vm.engineRawLuma
+    }
+    val line = contrastOn(local)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val shape = when (mode) {
             MeteringMode.SPOT -> Modifier
                 .size(32.dp)
-                .border(1.5.dp, ColorInk.copy(alpha = 0.7f), CircleShape)
+                .border(1.5.dp, line, CircleShape)
             MeteringMode.CENTER -> Modifier
                 .size(96.dp)
-                .border(1.5.dp, ColorInk.copy(alpha = 0.7f), CircleShape)
+                .border(1.5.dp, line, CircleShape)
             else -> Modifier
                 .size(width = 160.dp, height = 112.dp)
-                .border(1.5.dp, ColorInk.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                .border(1.5.dp, line, RoundedCornerShape(4.dp))
         }
         Box(shape) {
             Box(
@@ -169,7 +188,7 @@ private fun ModeReticle(mode: MeteringMode) {
                     .align(Alignment.Center)
                     .size(6.dp)
                     .clip(CircleShape)
-                    .background(ColorAccent),
+                    .background(line),
             )
         }
     }
@@ -204,7 +223,19 @@ private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
 
     Box(Modifier.fillMaxSize()) {
         val engineEvs = vm.spotDisplayEvs
+        val base = vm.baseEv
         vm.spots.forEachIndexed { index, spot ->
+            val spotKeyline = contrastOn(
+                run {
+                    val ev = engineEvs.getOrNull(index)
+                    if (ev != null && ev.isFinite() && base != null && vm.engineRawLuma > 0.0) {
+                        (vm.engineRawLuma * 2.0.pow((ev - base).coerceIn(-6.0, 6.0)))
+                            .coerceIn(0.0, 1.0)
+                    } else {
+                        vm.engineRawLuma
+                    }
+                },
+            )
                 val ev = engineEvs.getOrNull(index)?.takeIf { it.isFinite() } ?: spot.ev100
                 SpotHandle(
                     x = spot.x * boxWidth,
@@ -212,6 +243,7 @@ private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
                     boxWidth = boxWidth,
                     boxHeight = boxHeight,
                     label = "${index + 1} \u00b7 ${FormatUtils.evText(ev)}",
+                    keyline = spotKeyline,
                     onDrag = { nx, ny -> vm.updateSpot(spot.id, nx / boxWidth, ny / boxHeight) },
                     onDelete = { vm.removeSpot(spot.id) },
                 )
@@ -230,6 +262,7 @@ private fun SpotHandle(
     boxWidth: Float,
     boxHeight: Float,
     label: String,
+    keyline: Color,
     onDrag: (Float, Float) -> Unit,
     onDelete: (() -> Unit)?,
 ) {
@@ -272,6 +305,8 @@ private fun SpotHandle(
                 Modifier
                     .size(24.dp)
                     .clip(CircleShape)
+                    .border(1.5.dp, keyline, CircleShape)
+                    .padding(1.dp)
                     .border(1.5.dp, ColorAccent, CircleShape)
                     .background(ColorBody.copy(alpha = 0.25f)),
                 contentAlignment = Alignment.Center,

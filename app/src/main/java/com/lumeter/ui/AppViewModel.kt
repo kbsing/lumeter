@@ -50,6 +50,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // Engine-derived state (published by CameraManager, throttled here)
     var engineSceneEv by mutableStateOf<Double?>(null)
         private set
+
+    /** Full-frame median linear luma (0..1) of the current stable reading. */
+    var engineRawLuma by mutableStateOf(0.0)
+        private set
     var engineSpotEvs by mutableStateOf<List<Double>>(emptyList())
         private set
     var aeConverged by mutableStateOf(false)
@@ -227,7 +231,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val now = System.nanoTime()
         if (now - lastEmitNanos < EMIT_INTERVAL_NS) return
         lastEmitNanos = now
-        engineSceneEv = state.reading?.sceneEv100 ?: engineSceneEv
+        state.reading?.let {
+            engineSceneEv = it.sceneEv100
+            engineRawLuma = it.rawLuma
+        } ?: run { engineSceneEv = engineSceneEv }
         engineSpotEvs = state.spotEvs
         aeConverged = state.aeConverged
         analysisWidth = state.analysisWidth

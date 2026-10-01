@@ -26,6 +26,7 @@ object FormatUtils {
 
     /** Format aperture as "f/5.6" */
     fun formatAperture(aperture: Double): String {
+        if (aperture < 1.05) return "f/0.95"
         return if (aperture == round(aperture)) {
             "f/${aperture.toInt()}"
         } else {
