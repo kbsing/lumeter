@@ -95,7 +95,7 @@
     <string name="accent_colour">主題色</string>
     <string name="calibration_menu">校準</string>
     <string name="calibration_desc">感測器偏移和反射光常數。</string>
-    <string name="version">LUMEN MK·I — v0.7.1</string>
+    <string name="version">LUMEN MK·I — v0.7.2</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">琥珀</string>

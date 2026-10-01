@@ -332,7 +332,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
      * the YUV path, persisting the off state so the next launch does not retry blindly.
      */
     fun startRawCamera(surfaceTexture: android.graphics.SurfaceTexture) {
-        if (rawActive || !rawMode) return
+        if (!rawMode) return
+        if (rawActive) {
+            // Returning to the meter page: the old TextureView died with the page and
+            // the orphaned session is writing to a released surface. Rebuild on this one
+            // instead of ignoring the new surface (which shows a black viewfinder).
+            cameraManager.stopRaw()
+            rawActive = false
+        }
         cameraManager.startRaw(
             surfaceTexture = surfaceTexture,
             meteringMode = meteringMode,

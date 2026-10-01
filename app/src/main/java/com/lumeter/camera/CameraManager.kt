@@ -36,6 +36,7 @@ import java.util.concurrent.Executors
 class CameraManager(private val context: Context) {
 
     private val resultStore = CaptureResultStore()
+    @Volatile private var bindRetries = 0
     private var provider: ProcessCameraProvider? = null
     private var executor: ExecutorService? = null
     private var analysis: ImageAnalysis? = null
@@ -115,6 +116,28 @@ class CameraManager(private val context: Context) {
                     useCase,
                 )
                 meter.defaultAperture = backCameraAperture(camera)
+                bindRetries = 0
+            }.onFailure { error ->
+                // A swallowed bind failure IS the black-viewfinder bug; make it visible
+                // and retry once — the previous session can still be closing underneath.
+                android.util.Log.i(TAG, "bind failed (attempt $bindRetries): $error")
+                if (bindRetries < 1) {
+                    bindRetries++
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        runCatching {
+                            val camera = cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                CameraSelector.DEFAULT_BACK_CAMERA,
+                                freshPreview,
+                                useCase,
+                            )
+                            meter.defaultAperture = backCameraAperture(camera)
+                            bindRetries = 0
+                        }.onFailure { retryError ->
+                            android.util.Log.i(TAG, "bind retry failed: $retryError")
+                        }
+                    }, 300)
+                }
             }
         }, ContextCompat.getMainExecutor(context))
     }
@@ -177,4 +200,8 @@ class CameraManager(private val context: Context) {
             info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES)
                 ?.firstOrNull() ?: 2.0f
         }.getOrDefault(2.0f)
+
+    private companion object {
+        private const val TAG = "LumeterCamera"
+    }
 }

@@ -95,7 +95,7 @@
     <string name="accent_colour">アクセントカラー</string>
     <string name="calibration_menu">キャリブレーション</string>
     <string name="calibration_desc">センサーオフセットと反射光定数。</string>
-    <string name="version">LUMEN MK·I — v0.7.1</string>
+    <string name="version">LUMEN MK·I — v0.7.2</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">アンバー</string>
