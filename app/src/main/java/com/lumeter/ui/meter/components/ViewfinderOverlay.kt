@@ -256,7 +256,7 @@ private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
                     boxHeight = boxHeight,
                     label = "${index + 1} \u00b7 ${FormatUtils.evText(ev)}",
                     onDrag = { nx, ny -> vm.updateSpot(spot.id, nx / boxWidth, ny / boxHeight) },
-                    onTap = { vm.removeSpot(spot.id) },
+                    onDelete = { vm.removeSpot(spot.id) },
                 )
             }
         } else {
@@ -268,7 +268,7 @@ private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
                 boxHeight = boxHeight,
                 label = FormatUtils.evText(ev),
                 onDrag = { nx, ny -> vm.setSpotPos(nx / boxWidth, ny / boxHeight) },
-                onTap = null,
+                onDelete = null,
             )
         }
     }
@@ -286,7 +286,7 @@ private fun SpotHandle(
     boxHeight: Float,
     label: String,
     onDrag: (Float, Float) -> Unit,
-    onTap: (() -> Unit)?,
+    onDelete: (() -> Unit)?,
 ) {
     // Keep the gesture lambdas reading the latest position: the pointerInput(Unit)
     // block runs once, so closures would otherwise capture the initial coordinates.
@@ -317,7 +317,9 @@ private fun SpotHandle(
                     }
                 }
                 .pointerInput(Unit) {
-                    detectTapGestures { onTap?.invoke() }
+                    detectTapGestures(
+                        onLongPress = { onDelete?.invoke() },
+                    )
                 },
             contentAlignment = Alignment.Center,
         ) {

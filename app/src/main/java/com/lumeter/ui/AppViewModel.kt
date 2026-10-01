@@ -311,7 +311,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun addSpot(x: Float, y: Float, ev100: Double) {
         if (spots.size >= MAX_SPOTS) return
         spots = spots + SpotMeasurement(
-            id = System.currentTimeMillis(),
+            id = nextSpotId(),
             x = x,
             y = y,
             ev100 = ev100,
@@ -417,7 +417,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     companion object {
-        const val MAX_SPOTS = 6
+        const val MAX_SPOTS = 12
+        private val spotIdCounter = java.util.concurrent.atomic.AtomicLong(1)
+        private fun nextSpotId(): Long = spotIdCounter.getAndIncrement()
         private const val EMIT_INTERVAL_NS = 100_000_000L // 10 Hz readout
 
         fun formatTimestamp(timestamp: Long): String {

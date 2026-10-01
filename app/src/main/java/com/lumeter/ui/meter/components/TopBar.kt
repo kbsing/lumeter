@@ -180,6 +180,7 @@ fun MultiSpotInfo(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
         Text(
             buildString {
                 append("${vm.spots.size}/${AppViewModel.MAX_SPOTS} ${stringResource(R.string.spots).uppercase()}")
+                if (vm.spots.size >= AppViewModel.MAX_SPOTS) append(" · MAX")
                 if (vm.spots.size > 1) {
                     append(" · ${stringResource(R.string.range).uppercase()} ${FormatUtils.evText(spread)} EV")
                 }
