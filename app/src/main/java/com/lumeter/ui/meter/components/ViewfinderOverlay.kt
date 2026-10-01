@@ -110,7 +110,6 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                 },
         )
 
-        CornerMarks()
         ModeReticle(vm.meteringMode)
 
         if (vm.meteringMode == MeteringMode.MULTI || vm.meteringMode == MeteringMode.SPOT) {
@@ -119,23 +118,17 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                 vm,
                 Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = 16.dp, top = 44.dp),
+                    .padding(start = 10.dp, top = 8.dp),
             )
         }
 
-        StatusLine(
-            vm,
-            Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 16.dp, top = 16.dp),
-        )
         Text(
             "${vm.luxText} ${stringResource(R.string.lux)}",
             style = LabelTiny,
             color = ColorInk.copy(alpha = 0.8f),
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(end = 16.dp, top = 16.dp),
+                .padding(end = 12.dp, top = 10.dp),
         )
 
         ReadoutPanel(vm, Modifier.align(Alignment.BottomCenter))
@@ -151,34 +144,6 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                     .fillMaxSize()
                     .background(Color.White.copy(alpha = 0.55f * maxOf(alpha, 0.0001f))),
             )
-        }
-    }
-}
-
-@Composable
-private fun CornerMarks() {
-    // True L-shaped viewfinder corners (two strokes each), not square outlines.
-    val stroke = ColorInk.copy(alpha = 0.7f)
-    Canvas(Modifier.fillMaxSize()) {
-        val len = 20.dp.toPx()
-        val w = 2.dp.toPx()
-        val m = 14.dp.toPx()
-        val corners = listOf(
-            Offset(m, m) to listOf(Offset(1f, 0f), Offset(0f, 1f)),
-            Offset(size.width - m, m) to listOf(Offset(-1f, 0f), Offset(0f, 1f)),
-            Offset(m, size.height - m) to listOf(Offset(1f, 0f), Offset(0f, -1f)),
-            Offset(size.width - m, size.height - m) to listOf(Offset(-1f, 0f), Offset(0f, -1f)),
-        )
-        corners.forEach { (corner, dirs) ->
-            dirs.forEach { dir ->
-                drawLine(
-                    color = stroke,
-                    start = corner,
-                    end = Offset(corner.x + dir.x * len, corner.y + dir.y * len),
-                    strokeWidth = w,
-                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                )
-            }
         }
     }
 }
@@ -358,33 +323,6 @@ private fun SpotHandle(
 }
 
 @Composable
-private fun StatusLine(vm: AppViewModel, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        val dotColor = when {
-            vm.aeHold -> ColorAccent
-            vm.liveMetering -> LumenPalette.LiveRed
-            else -> ColorDim
-        }
-        Box(
-            Modifier
-                .size(6.dp)
-                .clip(CircleShape)
-                .background(dotColor),
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            when {
-                vm.aeHold -> stringResource(R.string.locked)
-                vm.liveMetering -> stringResource(R.string.live)
-                else -> stringResource(R.string.paused)
-            } + (if (vm.ndFilter > 0) " · ND${vm.ndFilter}" else ""),
-            style = LabelTiny,
-            color = ColorInk.copy(alpha = 0.8f),
-        )
-    }
-}
-
-@Composable
 private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
     val solver = vm.solverResult
     val rightLabel = when (vm.exposureMode) {
@@ -413,21 +351,25 @@ private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
                     listOf(ColorBody.copy(alpha = 0f), ColorBody.copy(alpha = 0.9f)),
                 ),
             )
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
             Column {
-                Text(stringResource(R.string.ev_iso_100), style = LabelTiny, color = ColorDim)
+                Text(
+                    stringResource(R.string.ev_iso_100),
+                    style = LabelTiny.copy(fontSize = 9.sp),
+                    color = ColorDim,
+                )
                 Text(
                     FormatUtils.evText(vm.ev100),
-                    style = DisplayLarge,
+                    style = DisplayLarge.copy(fontSize = 58.sp, lineHeight = 50.sp),
                     color = ColorInk,
                 )
             }
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(bottom = 6.dp)) {
                 Text(rightLabel, style = LabelTiny, color = ColorDim)
-                Text(rightValue, style = DisplayMedium, color = rightColor)
+                Text(rightValue, style = DisplayMedium.copy(fontSize = 34.sp, lineHeight = 34.sp), color = rightColor)
             }
         }
         ExposureScaleCanvas(
@@ -435,7 +377,7 @@ private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
             matched = vm.matched,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 6.dp),
+                .padding(top = 2.dp),
         )
     }
 }
@@ -454,13 +396,13 @@ fun ExposureScaleCanvas(needle: Double, matched: Boolean, modifier: Modifier = M
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .height(26.dp),
+                .height(16.dp),
         ) {
             val tickCount = 25
             val step = size.width / (tickCount - 1)
             repeat(tickCount) { i ->
                 val long = i % 4 == 0
-                val h = if (long) 14.dp.toPx() else 9.dp.toPx()
+                val h = if (long) 9.dp.toPx() else 6.dp.toPx()
                 drawLine(
                     color = ColorInk.copy(alpha = if (long) 0.7f else 0.4f),
                     start = Offset(i * step, 0f),
@@ -474,13 +416,13 @@ fun ExposureScaleCanvas(needle: Double, matched: Boolean, modifier: Modifier = M
                 color = accent.copy(alpha = 0.35f),
                 start = Offset(x, 0f),
                 end = Offset(x, size.height),
-                strokeWidth = 5.dp.toPx(),
+                strokeWidth = 3.dp.toPx(),
             )
             drawLine(
                 color = accent,
                 start = Offset(x, 0f),
                 end = Offset(x, size.height),
-                strokeWidth = 2.dp.toPx(),
+                strokeWidth = 1.5.dp.toPx(),
             )
         }
         Row(
@@ -490,7 +432,7 @@ fun ExposureScaleCanvas(needle: Double, matched: Boolean, modifier: Modifier = M
             listOf("−3", "−2", "−1", "0", "+1", "+2", "+3").forEachIndexed { i, label ->
                 Text(
                     label,
-                    fontSize = 9.sp,
+                    fontSize = 8.sp,
                     color = if (i == 3 && matched) ColorAccent else ColorDim,
                 )
             }

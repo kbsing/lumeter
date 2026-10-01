@@ -48,9 +48,7 @@ fun MeterPage(appViewModel: AppViewModel = viewModel()) {
         if (hasPermission) {
             Viewfinder(
                 appViewModel,
-                Modifier
-                    .fillMaxSize()
-                    .weight(1f),
+                Modifier.weight(1f),
             )
             BottomControls(appViewModel)
         } else {

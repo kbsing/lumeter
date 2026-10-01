@@ -1,5 +1,10 @@
 package com.lumeter.ui.meter.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,49 +27,85 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
-import com.lumeter.R
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lumeter.R
 import com.lumeter.core.exposure.ExposureMode
 import com.lumeter.core.exposure.ExposureSolver
 import com.lumeter.data.ActiveField
 import com.lumeter.ui.AppViewModel
 import com.lumeter.ui.common.FormatUtils
+import com.lumeter.ui.theme.BarlowCondensed
 import com.lumeter.ui.theme.ColorAccent
 import com.lumeter.ui.theme.ColorBody
 import com.lumeter.ui.theme.ColorDim
 import com.lumeter.ui.theme.ColorInk
-import com.lumeter.ui.theme.ColorLine
 import com.lumeter.ui.theme.ColorPanel
 import com.lumeter.ui.theme.ColorPanel2
 import com.lumeter.ui.theme.DisplayCell
 import com.lumeter.ui.theme.LabelTiny
 
 /**
- * Bottom control area from the reference design: A/S/M segmented selector, exposure
- * compensation, the three parameter cells, the snapping value ruler for the active
- * field, and the shutter ring / pause / log row.
+ * Bottom control area. Collapsed it is a single slim summary bar (the viewfinder gets
+ * nearly the whole screen); tapping it — or any of its three value cells — expands the
+ * full panel: A/S/M, exposure compensation, parameter cells, value ruler and the
+ * action row. The handle bar collapses it again.
  */
 @Composable
 fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
     val vm = appViewModel
+
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(ColorPanel)
+            .navigationBarsPadding(),
+    ) {
+        AnimatedVisibility(
+            visible = vm.controlsExpanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            ExpandedPanel(vm)
+        }
+        AnimatedVisibility(
+            visible = !vm.controlsExpanded,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            CollapsedBar(vm)
+        }
+    }
+}
+
+@Composable
+private fun ExpandedPanel(vm: AppViewModel) {
     val haptics = LocalHapticFeedback.current
     fun tick() {
         if (vm.hapticFeedback) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
     }
 
     Column(
-        modifier
+        Modifier
             .fillMaxWidth()
-            .background(ColorBody)
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp),
     ) {
+        // Collapse handle
+        Box(
+            Modifier
+                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .height(26.dp)
+                .clickable { tick(); vm.toggleControls() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("\u25BE", fontSize = 14.sp, color = ColorDim)
+        }
+
         // A/S/M + exposure compensation
         Row(
             Modifier.fillMaxWidth(),
@@ -74,7 +115,7 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             Row(
                 Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(ColorPanel)
+                    .background(ColorBody)
                     .padding(2.dp),
             ) {
                 listOf(
@@ -94,7 +135,7 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                     ) {
                         Text(
                             label,
-                            fontFamily = com.lumeter.ui.theme.BarlowCondensed,
+                            fontFamily = BarlowCondensed,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 20.sp,
                             color = if (on) ColorBody else ColorDim,
@@ -136,7 +177,11 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             )
             ParameterCell(
                 label = stringResource(R.string.aperture).uppercase(),
-                value = if (apertureLocked) stringResource(R.string.auto).uppercase() else FormatUtils.aperture(apertureValue),
+                value = if (apertureLocked) {
+                    stringResource(R.string.auto).uppercase()
+                } else {
+                    FormatUtils.aperture(apertureValue)
+                },
                 active = vm.activeField == ActiveField.APERTURE,
                 locked = apertureLocked,
                 modifier = Modifier.weight(1f),
@@ -144,7 +189,11 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             )
             ParameterCell(
                 label = stringResource(R.string.shutter).uppercase(),
-                value = if (shutterLocked) stringResource(R.string.auto).uppercase() else FormatUtils.shutter(shutterValue),
+                value = if (shutterLocked) {
+                    stringResource(R.string.auto).uppercase()
+                } else {
+                    FormatUtils.shutter(shutterValue)
+                },
                 active = vm.activeField == ActiveField.SHUTTER,
                 locked = shutterLocked,
                 modifier = Modifier.weight(1f),
@@ -165,7 +214,7 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(ColorPanel.copy(alpha = 0.5f))
+                    .background(ColorBody.copy(alpha = 0.5f))
                     .padding(vertical = 20.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -196,14 +245,16 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
 
         Spacer(Modifier.height(10.dp))
 
-        // Log reading (left) / pause-or-single-shot (center) / reading count (right)
+        // Log reading (left) / pause-resume (center) / reading count (right)
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "◉ " + stringResource(R.string.log_reading).uppercase(),
+                "\u25C9 " + stringResource(R.string.log_reading).uppercase(),
                 style = LabelTiny,
                 color = ColorInk,
                 modifier = Modifier
@@ -226,7 +277,6 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                     .padding(vertical = 6.dp),
             )
 
-            // Small action circle: pause when live, take one reading when paused.
             Box(
                 Modifier
                     .size(48.dp)
@@ -235,20 +285,19 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                     .border(1.5.dp, ColorInk.copy(alpha = 0.8f), CircleShape)
                     .clickable {
                         tick()
-                        if (vm.liveMetering) vm.toggleLiveMetering() else vm.singleShot()
+                        vm.toggleMeterPause()
                     },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    if (vm.liveMetering) "❚❚" else "●",
+                    if (vm.effectiveLive) "\u275A\u275A" else "\u25B6",
                     color = ColorAccent,
-                    fontSize = if (vm.liveMetering) 14.sp else 20.sp,
+                    fontSize = 16.sp,
                 )
             }
 
-            // Passive reading count: history is reached from the top bar only.
             Text(
-                "· ${vm.logEntries.size} ·",
+                "\u00B7 ${vm.logEntries.size} \u00B7",
                 style = LabelTiny,
                 color = ColorDim.copy(alpha = 0.7f),
                 modifier = Modifier.width(96.dp),
@@ -259,34 +308,132 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun CollapsedBar(vm: AppViewModel) {
+    val haptics = LocalHapticFeedback.current
+    fun tick() {
+        if (vm.hapticFeedback) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+    val solver = vm.solverResult
+    val apertureLocked = vm.exposureMode == ExposureMode.SHUTTER_PRIORITY
+    val shutterLocked = vm.exposureMode == ExposureMode.APERTURE_PRIORITY
+    val apertureText = if (apertureLocked) {
+        solver?.let { FormatUtils.aperture(it.apertureSnapped) } ?: "AUTO"
+    } else {
+        FormatUtils.aperture(vm.userAperture)
+    }
+    val shutterText = if (shutterLocked) {
+        solver?.let { FormatUtils.shutter(it.shutterSnapped) } ?: "AUTO"
+    } else {
+        FormatUtils.shutter(vm.userShutter)
+    }
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SummaryCell(
+            label = stringResource(R.string.iso),
+            value = vm.userIso.toString(),
+            active = vm.activeField == ActiveField.ISO,
+            modifier = Modifier.weight(1f),
+        ) {
+            tick(); vm.setActiveField(ActiveField.ISO); vm.toggleControls()
+        }
+        SummaryCell(
+            label = stringResource(R.string.aperture),
+            value = apertureText,
+            active = vm.activeField == ActiveField.APERTURE,
+            modifier = Modifier.weight(1f),
+        ) {
+            tick(); vm.setActiveField(ActiveField.APERTURE); vm.toggleControls()
+        }
+        SummaryCell(
+            label = stringResource(R.string.shutter),
+            value = shutterText,
+            active = vm.activeField == ActiveField.SHUTTER,
+            modifier = Modifier.weight(1f),
+        ) {
+            tick(); vm.setActiveField(ActiveField.SHUTTER); vm.toggleControls()
+        }
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(ColorBody)
+                .clickable { tick(); vm.toggleControls() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("\u25B2", fontSize = 13.sp, color = ColorDim)
+        }
+    }
+}
+
+@Composable
+private fun SummaryCell(
+    label: String,
+    value: String,
+    active: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (active) ColorPanel2 else ColorBody)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+    ) {
+        Text(
+            label.uppercase(),
+            style = LabelTiny.copy(fontSize = 8.sp),
+            color = if (active) ColorAccent else ColorDim,
+        )
+        Text(
+            value,
+            fontFamily = BarlowCondensed,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 20.sp,
+            lineHeight = 20.sp,
+            color = ColorInk,
+        )
+    }
+}
+
+@Composable
 private fun ExpCompControl(vm: AppViewModel, tick: () -> Unit) {
     val step = if (vm.thirdStopIncrements) 1.0 / 3.0 else 0.5
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(R.string.exp_comp).uppercase(), style = LabelTiny, color = ColorDim)
+        Text(
+            stringResource(R.string.exp_comp).uppercase(),
+            style = LabelTiny,
+            color = ColorDim,
+        )
         Spacer(Modifier.width(8.dp))
         Box(
             Modifier
                 .size(32.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(ColorPanel)
+                .background(ColorBody)
                 .clickable { tick(); vm.adjustExpComp(-step) },
             contentAlignment = Alignment.Center,
         ) {
-            Text("−", color = ColorInk, fontWeight = FontWeight.Bold)
+            Text("\u2212", color = ColorInk, fontWeight = FontWeight.Bold)
         }
         Text(
             FormatUtils.signed(vm.expComp),
             color = if (vm.expComp != 0.0) ColorAccent else ColorInk,
             fontSize = 14.sp,
-            modifier = Modifier
-                .width(44.dp),
+            modifier = Modifier.width(44.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         Box(
             Modifier
                 .size(32.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(ColorPanel)
+                .background(ColorBody)
                 .clickable { tick(); vm.adjustExpComp(step) },
             contentAlignment = Alignment.Center,
         ) {
@@ -307,12 +454,12 @@ private fun ParameterCell(
     Column(
         modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(if (active) ColorPanel2 else ColorPanel)
+            .background(if (active) ColorPanel2 else ColorBody)
             .clickable(enabled = !locked) { onClick() }
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Text(
-            if (locked) "$label · AUTO" else label,
+            if (locked) "$label \u00b7 AUTO" else label,
             style = LabelTiny.copy(fontSize = 9.sp),
             color = if (active && !locked) ColorAccent else ColorDim,
         )

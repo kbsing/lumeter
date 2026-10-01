@@ -100,6 +100,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // Settings
     var liveMetering by mutableStateOf(true)
         private set
+
+    /** Session-level pause from the bottom action button; never persisted. */
+    var meterPaused by mutableStateOf(false)
+        private set
+
+    /** Whether the bottom parameter panel is expanded (session state). */
+    var controlsExpanded by mutableStateOf(true)
+        private set
+
+    /** Metering actually streams only when the preference is on and not session-paused. */
+    val effectiveLive: Boolean get() = liveMetering && !meterPaused
     var thirdStopIncrements by mutableStateOf(false)
         private set
     private var _hapticFeedback by mutableStateOf(true)
@@ -205,7 +216,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         cameraManager.analyzer?.let { engine ->
             engine.meteringMode = meteringMode
             engine.hold = aeHold
-            engine.live = liveMetering
+            engine.live = effectiveLive
         }
     }
 
@@ -302,8 +313,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleLiveMetering() {
         liveMetering = !liveMetering
-        cameraManager.analyzer?.live = liveMetering
+        cameraManager.analyzer?.live = effectiveLive
         viewModelScope.launch { runCatching { prefs.setLiveMetering(liveMetering) } }
+    }
+
+    fun toggleControls() {
+        controlsExpanded = !controlsExpanded
+    }
+
+    /** Bottom action button: pause live metering for this session, press again to resume. */
+    fun toggleMeterPause() {
+        meterPaused = !meterPaused
+        cameraManager.analyzer?.live = effectiveLive
     }
 
     // Multi-spot
