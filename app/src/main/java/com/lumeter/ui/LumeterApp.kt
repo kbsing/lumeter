@@ -24,6 +24,13 @@ import com.lumeter.ui.theme.LumenTheme
  */
 @Composable
 fun LumeterApp(appViewModel: AppViewModel = viewModel()) {
+    // System back walks the page hierarchy (calibration → settings → meter) instead of
+    // exiting to the launcher; back on the meter page keeps the default exit behavior.
+    val page = appViewModel.currentPage
+    androidx.activity.compose.BackHandler(enabled = page != AppPage.METER) {
+        val parent = if (page == AppPage.CALIBRATION) AppPage.SETTINGS else AppPage.METER
+        appViewModel.navigateTo(parent)
+    }
     LumenTheme(accent = appViewModel.accentColor) {
         Box(
             Modifier
