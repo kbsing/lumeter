@@ -115,4 +115,6 @@
     <string name="resume">▶ RESUME</string>
     <string name="log_reading">Log reading</string>
     <string name="remove_spot">Remove spot %1$d</string>
+    <string name="language">Language</string>
+    <string name="language_system">System</string>
 </resources>

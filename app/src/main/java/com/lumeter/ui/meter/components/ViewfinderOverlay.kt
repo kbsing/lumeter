@@ -55,6 +55,7 @@ import com.lumeter.ui.theme.DisplayLarge
 import com.lumeter.ui.theme.DisplayMedium
 import com.lumeter.ui.theme.LabelTiny
 import com.lumeter.ui.theme.LumenPalette
+import kotlin.math.roundToInt
 
 /**
  * Viewfinder container: hosts the camera preview plus every overlay from the reference
@@ -240,7 +241,15 @@ private fun MultiSpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) 
             val y = spot.y * boxHeight
             Box(
                 Modifier
-                    .offset { androidx.compose.ui.unit.IntOffset((x - 44).toInt(), (y - 44).toInt()) }
+                    .offset {
+                        // Center the 88dp container on the tap point; convert its half
+                        // size to px inside the Density-receiver lambda.
+                        val half = 44.dp.roundToPx()
+                        androidx.compose.ui.unit.IntOffset(
+                            (x - half).roundToInt(),
+                            (y - half).roundToInt(),
+                        )
+                    }
                     .size(88.dp),
                 contentAlignment = Alignment.Center,
             ) {

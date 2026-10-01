@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.sp
 import com.lumeter.core.exposure.ExposureMode
 import com.lumeter.core.exposure.ExposureSolver
 import com.lumeter.data.ActiveField
-import com.lumeter.ui.AppPage
 import com.lumeter.ui.AppViewModel
 import com.lumeter.ui.common.FormatUtils
 import com.lumeter.ui.theme.ColorAccent
@@ -54,7 +53,7 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
     val vm = appViewModel
     val haptics = LocalHapticFeedback.current
     fun tick() {
-        if (vm.hapticFeedback) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        if (vm.hapticFeedback) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
     }
 
     Column(
@@ -227,18 +226,15 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                     vm.logReading(ev, ap, sh)
                 },
             )
+            // Passive reading count: history is reached from the top bar only.
             Box(
                 Modifier.width(80.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
                 Text(
-                    "LOG · ${vm.logEntries.size}",
+                    "· ${vm.logEntries.size} ·",
                     style = LabelTiny,
-                    color = ColorDim,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { tick(); vm.navigateTo(AppPage.HISTORY) }
-                        .padding(4.dp),
+                    color = ColorDim.copy(alpha = 0.7f),
                 )
             }
         }

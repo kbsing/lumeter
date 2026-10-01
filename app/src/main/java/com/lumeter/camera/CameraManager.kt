@@ -32,6 +32,7 @@ class CameraManager(private val context: Context) {
     private val resultStore = CaptureResultStore()
     private var provider: ProcessCameraProvider? = null
     private var executor: ExecutorService? = null
+    private var preview: Preview? = null
 
     var analyzer: MeterAnalyzer? = null
         private set
@@ -42,6 +43,9 @@ class CameraManager(private val context: Context) {
         previewView: PreviewView,
         onState: (MeterEngineState) -> Unit,
     ) {
+        // The Viewfinder rebuilds its PreviewView whenever the meter page re-enters
+        // composition (e.g. returning from Settings); always rebind the fresh surface.
+        preview?.setSurfaceProvider(previewView.surfaceProvider)
         if (analyzer != null) return
         val exec = Executors.newSingleThreadExecutor()
         executor = exec
@@ -56,9 +60,10 @@ class CameraManager(private val context: Context) {
         future.addListener({
             val cameraProvider = future.get()
             provider = cameraProvider
-            val preview = Preview.Builder().build().also {
+            val boundPreview = Preview.Builder().build().also {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
+            preview = boundPreview
             val resolutionSelector = ResolutionSelector.Builder()
                 .setResolutionStrategy(
                     ResolutionStrategy(
@@ -90,7 +95,7 @@ class CameraManager(private val context: Context) {
                 val camera = cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
+                    boundPreview,
                     analysis,
                 )
                 meter.defaultAperture = backCameraAperture(camera)
@@ -100,6 +105,7 @@ class CameraManager(private val context: Context) {
 
     fun stop() {
         runCatching { provider?.unbindAll() }
+        preview = null
         resultStore.clear()
         executor?.shutdown()
         analyzer = null

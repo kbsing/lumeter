@@ -17,6 +17,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.os.LocaleListCompat
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.lumeter.R
 import com.lumeter.ui.theme.AccentColor
 import com.lumeter.ui.AppPage
@@ -31,6 +35,10 @@ fun SettingsPage(
     appViewModel: AppViewModel,
     onBack: () -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
+    fun tick() {
+        if (appViewModel.hapticFeedback) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -98,6 +106,11 @@ fun SettingsPage(
                 checked = appViewModel.hapticFeedback,
                 onCheckedChange = { appViewModel.setHapticFeedback(!appViewModel.hapticFeedback) }
             )
+            
+            Spacer(Modifier.height(8.dp))
+            
+            // In-app language
+            LanguageRow(onPick = { tag -> tick(); applyLanguage(tag) })
             
             Spacer(Modifier.height(8.dp))
             
@@ -263,4 +276,72 @@ private fun AccentColorPicker(
             }
         }
     }
+}
+
+
+@Composable
+private fun LanguageRow(onPick: (String) -> Unit) {
+    val current = AppCompatDelegate.getApplicationLocales().toLanguageTags()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ColorPanel, RoundedCornerShape(8.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.language),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = ColorInk
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LanguageOption(
+                label = stringResource(R.string.language_system),
+                tag = "",
+                selected = current.isEmpty(),
+                onPick = onPick,
+                modifier = Modifier.weight(1f),
+            )
+            LanguageOption("简体中文", "zh-CN", current == "zh-CN", onPick, Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LanguageOption("繁體中文", "zh-TW", current == "zh-TW", onPick, Modifier.weight(1f))
+            LanguageOption("English", "en", current == "en", onPick, Modifier.weight(1f))
+            LanguageOption("日本語", "ja", current == "ja", onPick, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun LanguageOption(
+    label: String,
+    tag: String,
+    selected: Boolean,
+    onPick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (selected) ColorAccent else ColorPanel2)
+            .clickable { onPick(tag) }
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = if (selected) ColorBody else ColorInk,
+        )
+    }
+}
+
+private fun applyLanguage(tag: String) {
+    val locales = if (tag.isEmpty()) {
+        LocaleListCompat.getEmptyLocaleList()
+    } else {
+        LocaleListCompat.forLanguageTags(tag)
+    }
+    AppCompatDelegate.setApplicationLocales(locales)
 }

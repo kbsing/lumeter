@@ -115,4 +115,6 @@
     <string name="resume">▶ 再開</string>
     <string name="log_reading">測定値を記録</string>
     <string name="remove_spot">ポイント %1$d を削除</string>
+    <string name="language">言語</string>
+    <string name="language_system">システム</string>
 </resources>

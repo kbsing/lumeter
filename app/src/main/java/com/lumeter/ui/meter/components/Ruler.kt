@@ -68,7 +68,7 @@ fun ValueRuler(
             state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(60.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(ColorPanel),
             pageSpacing = 0.dp,
@@ -83,9 +83,9 @@ fun ValueRuler(
             ) {
                 Box(
                     Modifier
-                        .padding(top = 6.dp)
+                        .padding(top = 5.dp)
                         .width(2.dp)
-                        .height(if (on) 20.dp else 12.dp)
+                        .height(if (on) 18.dp else 10.dp)
                         .background(if (on) ColorAccent else ColorDim.copy(alpha = 0.5f)),
                 )
                 Text(
@@ -93,9 +93,10 @@ fun ValueRuler(
                     style = DisplaySmall.copy(
                         fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium,
                         fontSize = 22.sp,
+                        lineHeight = 26.sp,
                     ),
                     color = if (on) ColorAccent else ColorDim,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                    modifier = Modifier.padding(top = 3.dp, bottom = 4.dp),
                 )
             }
         }
@@ -103,14 +104,14 @@ fun ValueRuler(
         Box(
             Modifier
                 .width(32.dp)
-                .height(56.dp)
+                .height(60.dp)
                 .align(Alignment.CenterStart)
                 .background(Brush.horizontalGradient(listOf(ColorPanel, ColorPanel.copy(alpha = 0f)))),
         )
         Box(
             Modifier
                 .width(32.dp)
-                .height(56.dp)
+                .height(60.dp)
                 .align(Alignment.CenterEnd)
                 .background(Brush.horizontalGradient(listOf(ColorPanel.copy(alpha = 0f), ColorPanel))),
         )
