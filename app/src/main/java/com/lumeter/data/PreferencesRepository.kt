@@ -41,6 +41,7 @@ class PreferencesRepository(private val context: Context) {
         private val HISTOGRAM_ENABLED = booleanPreferencesKey("histogram_enabled")
         private val SPOT_DRAGGABLE = booleanPreferencesKey("spot_draggable")
         private val CURRENT_FILM = stringPreferencesKey("current_film_stock")
+        private val CURRENT_ROLL_ID = longPreferencesKey("current_roll_id")
     }
 
     // Read preferences
@@ -66,6 +67,7 @@ class PreferencesRepository(private val context: Context) {
             histogramEnabled = prefs[HISTOGRAM_ENABLED] ?: false,
             spotDraggable = prefs[SPOT_DRAGGABLE] ?: true,
             currentFilmStock = prefs[CURRENT_FILM],
+            currentRollId = prefs[CURRENT_ROLL_ID],
         )
     }
 
@@ -99,6 +101,10 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setCurrentFilmStock(name: String?) = edit { prefs ->
         if (name == null) prefs.remove(CURRENT_FILM) else prefs[CURRENT_FILM] = name
+    }
+
+    suspend fun setCurrentRollId(id: Long?) = edit { prefs ->
+        if (id == null) prefs.remove(CURRENT_ROLL_ID) else prefs[CURRENT_ROLL_ID] = id
     }
 
     suspend fun setKConstant(value: Double) = edit { it[K_CONSTANT] = value }

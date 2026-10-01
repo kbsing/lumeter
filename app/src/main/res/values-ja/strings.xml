@@ -95,7 +95,7 @@
     <string name="accent_colour">アクセントカラー</string>
     <string name="calibration_menu">キャリブレーション</string>
     <string name="calibration_desc">センサーオフセットと反射光定数。</string>
-    <string name="version">LUMEN MK·I — v0.7.4</string>
+    <string name="version">LUMEN MK·I — v0.8.0</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">アンバー</string>
@@ -182,4 +182,28 @@
     <string name="tool_distance">距離</string>
     <string name="tool_focal">焦点距離</string>
     <string name="tool_coc">錯乱円</string>
+
+    <!-- v0.8: film rolls, export, flash mix -->
+    <string name="tab_library">フィルム</string>
+    <string name="tab_rolls">自分のフィルム</string>
+    <string name="new_roll">新しいフィルム</string>
+    <string name="no_rolls">フィルムがありません。装填して枚数を記録しましょう。</string>
+    <string name="frames_count">枚数</string>
+    <string name="roll_loaded">装填</string>
+    <string name="set_current">使用中に設定</string>
+    <string name="current_chip">使用中</string>
+    <string name="archive">アーカイブ</string>
+    <string name="restore">復元</string>
+    <string name="archived_chip">アーカイブ済</string>
+    <string name="delete_roll_confirm">このフィルムを削除しますか?記録済みの読み取りは保持されます。</string>
+    <string name="notes">メモ(任意)</string>
+    <string name="create">作成</string>
+    <string name="filter_all">すべて</string>
+    <string name="export">書き出し</string>
+    <string name="flash_use_current">現在の測定を使用</string>
+    <string name="flash_needs">フラッシュ要求</string>
+    <string name="flash_ambient">環境光</string>
+    <string name="flash_mix_flash">フラッシュ主体</string>
+    <string name="flash_mix_balanced">バランス</string>
+    <string name="flash_mix_ambient">環境光主体</string>
 </resources>

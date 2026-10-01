@@ -23,6 +23,7 @@ import com.lumeter.core.meter.MeteringMode
 import com.lumeter.core.meter.ZoneMath
 import com.lumeter.data.FilmStocks
 import com.lumeter.data.ActiveField
+import com.lumeter.data.FilmRoll
 import com.lumeter.data.FilmStock
 import com.lumeter.data.PreferencesRepository
 import com.lumeter.data.Reading
@@ -51,7 +52,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = PreferencesRepository(application)
     private val readingRepo = ReadingRepository(
-        LumeterDatabase.getDatabase(application).readingDao(),
+        LumeterDatabase.getDatabase(application),
     )
     private val cameraManager = CameraManager(application)
 
@@ -121,6 +122,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // History
     var logEntries by mutableStateOf<List<Reading>>(emptyList())
         private set
+
+    // Film rolls
+    var rolls by mutableStateOf<List<FilmRoll>>(emptyList())
+        private set
+    var currentRollId by mutableStateOf<Long?>(null)
+        private set
+    private var _historyRollFilter by mutableStateOf<Long?>(null)
+    val historyRollFilter: Long? get() = _historyRollFilter
+
+    val activeRolls: List<FilmRoll>
+        get() = rolls.filter { !it.isArchived }
+
+    val currentRoll: FilmRoll?
+        get() = activeRolls.firstOrNull { it.id == currentRollId }
+
+    /** History entries narrowed by the roll filter (null = all). */
+    val filteredEntries: List<Reading>
+        get() = _historyRollFilter?.let { id -> logEntries.filter { it.rollId == id } }
+            ?: logEntries
 
     // Settings
     var liveMetering by mutableStateOf(true)
@@ -287,6 +307,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             runCatching { readingRepo.allReadings.collect { logEntries = it } }
         }
+        viewModelScope.launch {
+            runCatching { readingRepo.allRolls.collect { rolls = it } }
+        }
     }
 
     private fun applyPreferences(p: com.lumeter.data.UserPreferences) {
@@ -310,6 +333,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         histogramEnabled = p.histogramEnabled
         _spotDraggable = p.spotDraggable
         _currentFilmStock = p.currentFilmStock
+        currentRollId = p.currentRollId
     }
 
     private var preferencesLoaded = false
@@ -598,9 +622,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logReading(ev100: Double, aperture: Double, shutter: Double) {
         flashKey++
+        val roll = currentRoll
         viewModelScope.launch {
             runCatching {
-                readingRepo.insertReading(
+                readingRepo.logReading(
                     Reading(
                         timestamp = System.currentTimeMillis(),
                         ev100 = ev100,
@@ -608,7 +633,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         aperture = aperture,
                         shutter = shutter,
                         meteringMode = meteringMode.name,
+                        rollId = roll?.id,
+                        filmStock = currentFilmStock,
+                        source = if (rawActive) "RAW" else "YUV",
+                        zone = if (_zoneEnabled) _placedZone else null,
                     ),
+                    rollId = roll?.id,
                 )
             }
         }
@@ -616,6 +646,53 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteLogEntry(id: Long) {
         viewModelScope.launch { runCatching { readingRepo.deleteReadingById(id) } }
+    }
+
+    /** Writes the currently filtered history (plus the rolls) to a SAF document. */
+    fun exportHistory(context: android.content.Context, uri: android.net.Uri, format: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val entries = filteredEntries
+                val text = if (format == "json") {
+                    val json = kotlinx.serialization.json.Json { prettyPrint = true }
+                    json.encodeToString(
+                        com.lumeter.data.ExportPayload.serializer(),
+                        com.lumeter.data.ExportPayload(rolls = rolls, readings = entries),
+                    )
+                } else {
+                    exportCsv(entries)
+                }
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(text.toByteArray(Charsets.UTF_8))
+                }
+            }
+        }
+    }
+
+    private fun exportCsv(entries: List<Reading>): String = buildString {
+        append("timestamp,ev100,iso,aperture,shutter_s,metering_mode,film_stock,source,zone,roll_id\n")
+        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.US)
+        entries.forEach { r ->
+            append(fmt.format(java.util.Date(r.timestamp))).append(',')
+            append(r.ev100).append(',')
+            append(r.iso).append(',')
+            append(r.aperture).append(',')
+            append(r.shutter).append(',')
+            append(r.meteringMode).append(',')
+            append(csvEscape(r.filmStock)).append(',')
+            append(r.source ?: "").append(',')
+            append(r.zone?.toString() ?: "").append(',')
+            append(r.rollId?.toString() ?: "").append('\n')
+        }
+    }
+
+    private fun csvEscape(value: String?): String {
+        if (value.isNullOrBlank()) return ""
+        return if (value.contains(',') || value.contains('"')) {
+            "\"" + value.replace("\"", "\"\"") + "\""
+        } else {
+            value
+        }
     }
 
     // Settings
@@ -694,6 +771,61 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun clearFilmStock() {
         _currentFilmStock = null
         viewModelScope.launch { runCatching { prefs.setCurrentFilmStock(null) } }
+    }
+
+    // Film rolls
+
+    fun createRoll(stockName: String, iso: Int, frameCount: Int, notes: String) {
+        viewModelScope.launch {
+            runCatching {
+                val id = readingRepo.createRoll(
+                    FilmRoll(
+                        stockName = stockName,
+                        iso = iso,
+                        frameCount = frameCount,
+                        loadedAt = System.currentTimeMillis(),
+                        notes = notes,
+                    ),
+                )
+                currentRollId = id
+                prefs.setCurrentRollId(id)
+            }
+        }
+    }
+
+    /** Tap a roll card to make it the current one. */
+    fun setCurrentRoll(id: Long) {
+        currentRollId = if (currentRollId == id) null else id
+        viewModelScope.launch { runCatching { prefs.setCurrentRollId(currentRollId) } }
+    }
+
+    fun archiveRoll(id: Long, archived: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                readingRepo.setRollArchived(id, archived)
+                if (archived && currentRollId == id) {
+                    currentRollId = null
+                    prefs.setCurrentRollId(null)
+                }
+            }
+        }
+    }
+
+    fun deleteRoll(id: Long) {
+        viewModelScope.launch {
+            runCatching {
+                readingRepo.deleteRollById(id)
+                if (currentRollId == id) {
+                    currentRollId = null
+                    prefs.setCurrentRollId(null)
+                }
+                if (_historyRollFilter == id) _historyRollFilter = null
+            }
+        }
+    }
+
+    fun setHistoryRollFilter(id: Long?) {
+        _historyRollFilter = id
     }
 
     override fun onCleared() {

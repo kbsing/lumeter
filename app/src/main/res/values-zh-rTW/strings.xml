@@ -95,7 +95,7 @@
     <string name="accent_colour">主題色</string>
     <string name="calibration_menu">校準</string>
     <string name="calibration_desc">感測器偏移和反射光常數。</string>
-    <string name="version">LUMEN MK·I — v0.7.4</string>
+    <string name="version">LUMEN MK·I — v0.8.0</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">琥珀</string>
@@ -182,4 +182,28 @@
     <string name="tool_distance">距離</string>
     <string name="tool_focal">焦距</string>
     <string name="tool_coc">彌散圓</string>
+
+    <!-- v0.8: film rolls, export, flash mix -->
+    <string name="tab_library">膠片庫</string>
+    <string name="tab_rolls">我的膠捲</string>
+    <string name="new_roll">新膠捲</string>
+    <string name="no_rolls">還沒有膠捲。裝入一捲開始追蹤張數。</string>
+    <string name="frames_count">張數</string>
+    <string name="roll_loaded">裝入</string>
+    <string name="set_current">設為當前</string>
+    <string name="current_chip">當前</string>
+    <string name="archive">歸檔</string>
+    <string name="restore">恢復</string>
+    <string name="archived_chip">已歸檔</string>
+    <string name="delete_roll_confirm">刪除該膠捲?已記錄的讀數會保留。</string>
+    <string name="notes">備註(可選)</string>
+    <string name="create">建立</string>
+    <string name="filter_all">全部</string>
+    <string name="export">匯出</string>
+    <string name="flash_use_current">用當前讀數</string>
+    <string name="flash_needs">閃光需要</string>
+    <string name="flash_ambient">環境光</string>
+    <string name="flash_mix_flash">閃光為主</string>
+    <string name="flash_mix_balanced">均衡補光</string>
+    <string name="flash_mix_ambient">環境光為主</string>
 </resources>

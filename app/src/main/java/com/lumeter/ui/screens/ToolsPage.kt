@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.lumeter.R
 import com.lumeter.core.tools.DepthOfField
 import com.lumeter.core.tools.FlashMath
+import com.lumeter.core.tools.FlashMix
 import com.lumeter.core.tools.LatitudeMath
 import com.lumeter.core.tools.LatitudePlacement
 import com.lumeter.core.tools.Reciprocity
@@ -210,6 +211,7 @@ private fun FlashCard(appViewModel: AppViewModel) {
     val gns = listOf(12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 45.0, 58.0)
     val distances = listOf(1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0)
     var distance by remember { mutableStateOf(3.0) }
+    var useAmbient by remember { mutableStateOf(false) }
     val iso = appViewModel.userIso
     val fNumber = FlashMath.fNumber(guideNumber, distance, iso)
 
@@ -251,6 +253,54 @@ private fun FlashCard(appViewModel: AppViewModel) {
                 color = ColorDim,
                 modifier = Modifier.padding(bottom = 2.dp),
             )
+        }
+        Text(
+            stringResource(R.string.flash_use_current),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (useAmbient) ColorBody else ColorInk,
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(if (useAmbient) ColorAccent else ColorBody)
+                .clickable { useAmbient = !useAmbient }
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        )
+        if (useAmbient) {
+            val result = appViewModel.exposureResult
+            val ambient = result.solvedAperture ?: appViewModel.userAperture
+            val verdict = fNumber?.let { FlashMath.mixVerdict(ambient, it) }
+            if (verdict != null) {
+                Text(
+                    buildString {
+                        append(stringResource(R.string.flash_needs))
+                        append(" ")
+                        append(FormatUtils.aperture(fNumber))
+                        append("  ·  ")
+                        append(stringResource(R.string.flash_ambient))
+                        append(" ")
+                        append(FormatUtils.aperture(ambient))
+                    },
+                    fontSize = 11.sp,
+                    color = ColorInk,
+                )
+                Text(
+                    buildString {
+                        append(
+                            when (verdict.mix) {
+                                FlashMix.FLASH_DOMINANT -> stringResource(R.string.flash_mix_flash)
+                                FlashMix.BALANCED -> stringResource(R.string.flash_mix_balanced)
+                                FlashMix.AMBIENT_DOMINANT -> stringResource(R.string.flash_mix_ambient)
+                            },
+                        )
+                        append("  ")
+                        append(LatitudeMath.formatStops(verdict.stops))
+                        append(" EV")
+                    },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = ColorAccent,
+                )
+            }
         }
     }
 }

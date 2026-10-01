@@ -95,7 +95,7 @@
     <string name="accent_colour">Accent colour</string>
     <string name="calibration_menu">Calibration</string>
     <string name="calibration_desc">Sensor offset and reflected-light constant.</string>
-    <string name="version">LUMEN MK·I — v0.7.4</string>
+    <string name="version">LUMEN MK·I — v0.8.0</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">Amber</string>
@@ -182,4 +182,28 @@
     <string name="tool_distance">Distance</string>
     <string name="tool_focal">Focal length</string>
     <string name="tool_coc">Circle of confusion</string>
+
+    <!-- v0.8: film rolls, export, flash mix -->
+    <string name="tab_library">Library</string>
+    <string name="tab_rolls">My rolls</string>
+    <string name="new_roll">New roll</string>
+    <string name="no_rolls">No rolls yet. Load a stock to start tracking frames.</string>
+    <string name="frames_count">Frames</string>
+    <string name="roll_loaded">Loaded</string>
+    <string name="set_current">Set current</string>
+    <string name="current_chip">CURRENT</string>
+    <string name="archive">Archive</string>
+    <string name="restore">Restore</string>
+    <string name="archived_chip">ARCHIVED</string>
+    <string name="delete_roll_confirm">Delete this roll? Logged readings are kept.</string>
+    <string name="notes">Notes (optional)</string>
+    <string name="create">CREATE</string>
+    <string name="filter_all">ALL</string>
+    <string name="export">Export</string>
+    <string name="flash_use_current">Use current reading</string>
+    <string name="flash_needs">Flash needs</string>
+    <string name="flash_ambient">Ambient</string>
+    <string name="flash_mix_flash">Flash dominant</string>
+    <string name="flash_mix_balanced">Balanced fill</string>
+    <string name="flash_mix_ambient">Ambient dominant</string>
 </resources>

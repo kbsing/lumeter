@@ -201,4 +201,5 @@ data class UserPreferences(
     val histogramEnabled: Boolean = false,
     val spotDraggable: Boolean = true,
     val currentFilmStock: String? = null,
+    val currentRollId: Long? = null,
 )

@@ -70,8 +70,29 @@ object FlashMath {
         return fNumber * distanceM / isoScale(iso)
     }
 
+    /**
+     * Ambient-vs-flash balance: how many stops the ambient-required aperture sits
+     * from the flash-required one. Positive = ambient demands far more stop-down, so
+     * the flash output dwarfs it (flash dominant); negative = the flash barely
+     * registers against the ambient light.
+     */
+    fun mixVerdict(ambientFNumber: Double, flashFNumber: Double): FlashMixVerdict? {
+        if (ambientFNumber <= 0.0 || flashFNumber <= 0.0) return null
+        val stops = kotlin.math.ln(ambientFNumber / flashFNumber) / kotlin.math.ln(2.0)
+        val mix = when {
+            stops >= 1.0 -> FlashMix.FLASH_DOMINANT
+            stops <= -1.0 -> FlashMix.AMBIENT_DOMINANT
+            else -> FlashMix.BALANCED
+        }
+        return FlashMixVerdict(stops, mix)
+    }
+
     private fun isoScale(iso: Int): Double = sqrt(iso / 100.0)
 }
+
+enum class FlashMix { FLASH_DOMINANT, BALANCED, AMBIENT_DOMINANT }
+
+data class FlashMixVerdict(val stops: Double, val mix: FlashMix)
 
 /** Depth of field on the thin-lens model with circle of confusion. */
 data class DepthOfField(

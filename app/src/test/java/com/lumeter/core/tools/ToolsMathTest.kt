@@ -73,6 +73,30 @@ class ToolsMathTest {
         assertNull(FlashMath.guideNumberM(5.6, -1.0, 100))
     }
 
+    // ---- Flash/ambient mix ----
+
+    @Test
+    fun `bright ambient with weak flash is flash dominant`() {
+        // Ambient demands f/11, flash only f/4: the flash output dwarfs the daylight.
+        val v = FlashMath.mixVerdict(ambientFNumber = 11.0, flashFNumber = 4.0)!!
+        assertEquals(FlashMix.FLASH_DOMINANT, v.mix)
+        assertEquals(1.46, v.stops, 0.01)
+    }
+
+    @Test
+    fun `dim room with distant flash is ambient dominant`() {
+        val v = FlashMath.mixVerdict(ambientFNumber = 2.0, flashFNumber = 8.0)!!
+        assertEquals(FlashMix.AMBIENT_DOMINANT, v.mix)
+        assertEquals(-2.0, v.stops, 1e-9)
+    }
+
+    @Test
+    fun `within a stop counts as balanced fill`() {
+        assertEquals(FlashMix.BALANCED, FlashMath.mixVerdict(5.6, 4.0)!!.mix)
+        assertEquals(FlashMix.BALANCED, FlashMath.mixVerdict(4.0, 5.6)!!.mix)
+        assertNull(FlashMath.mixVerdict(0.0, 4.0))
+    }
+
     // ---- Depth of field ----
 
     @Test
