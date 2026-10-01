@@ -95,7 +95,7 @@
     <string name="accent_colour">Accent colour</string>
     <string name="calibration_menu">Calibration</string>
     <string name="calibration_desc">Sensor offset and reflected-light constant.</string>
-    <string name="version">LUMEN MK·I — v0.7.2</string>
+    <string name="version">LUMEN MK·I — v0.7.3</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">Amber</string>

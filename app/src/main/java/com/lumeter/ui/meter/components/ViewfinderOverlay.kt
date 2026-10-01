@@ -365,25 +365,38 @@ private fun DraggableSpotReticle(
     }
 }
 
-/** EV-domain frame histogram, drawn as translucent bars on a log axis. */
+/** Frame histogram in the standard camera style: contiguous filled silhouette on a dim box. */
 @Composable
 private fun HistogramOverlay(vm: AppViewModel, modifier: Modifier = Modifier) {
     val histogram = vm.engineHistogram ?: return
     if (histogram.size < 2) return
-    // Resolve the themed accent before the draw scope (not composable in there).
-    val accent = ColorAccent
-    Canvas(modifier.height(30.dp)) {
-        val max = histogram.max()
-        if (max <= 0) return@Canvas
-        val bar = size.width / histogram.size
-        for (i in histogram.indices) {
-            val h = (histogram[i].toFloat() / max) * (size.height - 2f)
-            if (h <= 0f) continue
-            drawRect(
-                color = accent.copy(alpha = 0.5f),
-                topLeft = Offset(i * bar, size.height - h),
-                size = androidx.compose.ui.geometry.Size(bar * 0.72f, h),
-            )
+    // Resolve theme colors before the draw scope.
+    val fill = ColorInk.copy(alpha = 0.8f)
+    Column(
+        modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(ColorBody.copy(alpha = 0.45f))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+    ) {
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(32.dp),
+        ) {
+            val max = histogram.max()
+            if (max <= 0) return@Canvas
+            val bar = size.width / histogram.size
+            val path = androidx.compose.ui.graphics.Path()
+            path.moveTo(0f, size.height)
+            for (i in histogram.indices) {
+                val h = (histogram[i].toFloat() / max) * size.height
+                val x = i * bar
+                path.lineTo(x, size.height - h)
+                path.lineTo(x + bar, size.height - h)
+            }
+            path.lineTo(size.width, size.height)
+            path.close()
+            drawPath(path, fill)
         }
     }
 }
