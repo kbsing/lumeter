@@ -56,6 +56,7 @@ import com.lumeter.ui.theme.ColorAccent
 import com.lumeter.ui.theme.ColorBody
 import com.lumeter.ui.theme.ColorDim
 import com.lumeter.ui.theme.ColorInk
+import com.lumeter.ui.theme.ColorLine
 import com.lumeter.ui.theme.ColorPanel
 import com.lumeter.ui.theme.DisplayLarge
 import com.lumeter.ui.theme.DisplayMedium
@@ -181,19 +182,22 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
 
         val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
             android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        // The histogram owns the finder's top-left corner (pro-camera placement);
+        // whatever else lives there shifts below it.
+        val topStartPad = if (vm.histogramEnabled) 68.dp else 8.dp
         if (vm.meteringMode == MeteringMode.MULTI) {
             MultiSpotInfo(
                 vm,
                 Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = 10.dp, top = 8.dp),
+                    .padding(start = 10.dp, top = topStartPad),
             )
         } else if (landscape) {
             LiveChip(
                 vm,
                 Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = 10.dp, top = 8.dp),
+                    .padding(start = 10.dp, top = topStartPad),
             )
         }
 
@@ -209,13 +213,11 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
         }
 
         if (vm.histogramEnabled) {
-            val stripPad = if (vm.meteringMode == MeteringMode.MULTI) 58.dp else 8.dp
             HistogramOverlay(
                 vm,
                 Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = if (landscape) stripPad + 34.dp else 8.dp)
-                    .fillMaxWidth(0.62f),
+                    .align(Alignment.TopStart)
+                    .padding(start = 10.dp, top = 8.dp),
             )
         }
 
@@ -365,26 +367,33 @@ private fun DraggableSpotReticle(
     }
 }
 
-/** Frame histogram in the standard camera style: contiguous filled silhouette on a dim box. */
+/**
+ * Frame histogram in the pro-camera style: a compact dark corner box with faint
+ * quartile grid ticks and a solid white luminance silhouette (dark left → bright
+ * right). Not themed beyond the app's ink color — instrument standard.
+ */
 @Composable
 private fun HistogramOverlay(vm: AppViewModel, modifier: Modifier = Modifier) {
     val histogram = vm.engineHistogram ?: return
     if (histogram.size < 2) return
     // Resolve theme colors before the draw scope.
-    val fill = ColorInk.copy(alpha = 0.8f)
-    Column(
+    val fill = ColorInk
+    val grid = ColorInk.copy(alpha = 0.25f)
+    Box(
         modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(ColorBody.copy(alpha = 0.45f))
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .size(width = 132.dp, height = 52.dp)
+            .background(ColorBody.copy(alpha = 0.7f))
+            .border(1.dp, ColorLine)
+            .padding(horizontal = 5.dp, vertical = 4.dp),
     ) {
-        Canvas(
-            Modifier
-                .fillMaxWidth()
-                .height(32.dp),
-        ) {
+        Canvas(Modifier.fillMaxSize()) {
             val max = histogram.max()
             if (max <= 0) return@Canvas
+            // Quartile ticks across the brightness axis.
+            for (q in 1..3) {
+                val gx = size.width * q / 4f
+                drawLine(grid, Offset(gx, 0f), Offset(gx, size.height), strokeWidth = 1f)
+            }
             val bar = size.width / histogram.size
             val path = androidx.compose.ui.graphics.Path()
             path.moveTo(0f, size.height)
