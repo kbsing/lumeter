@@ -246,6 +246,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         ndFilter = next
     }
 
+    /** One stable reading while paused, then freeze again. */
+    fun singleShot() {
+        cameraManager.analyzer?.oneShot = true
+    }
+
     fun toggleAeHold() {
         aeHold = !aeHold
         cameraManager.analyzer?.hold = aeHold

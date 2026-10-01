@@ -57,6 +57,8 @@ class MeterAnalyzer(
     @Volatile var spots: List<MeterSpot> = emptyList()
     @Volatile var hold: Boolean = false
     @Volatile var live: Boolean = true
+    /** When paused, take exactly one more stable reading, then freeze again. */
+    @Volatile var oneShot = false
 
     private val statRing = ArrayDeque<MeteringFrameStat>()
     private val exposureHistory = ArrayDeque<FrameExposure>()
@@ -74,7 +76,7 @@ class MeterAnalyzer(
             if (captureResult == null) return
 
             val exposure = frameExposure(captureResult) ?: return
-            if (hold || !live) {
+            if (hold || (!live && !oneShot)) {
                 publishFrozen()
                 return
             }
@@ -161,6 +163,9 @@ class MeterAnalyzer(
                 )
             }
 
+            if (oneShot && converged && statRing.size >= STAT_RING_SIZE) {
+                oneShot = false
+            }
             val fused = if (statRing.isNotEmpty()) {
                 MeteringFusion.fuse(statRing.toList(), MeteringSource.YUV_PREVIEW)
             } else {

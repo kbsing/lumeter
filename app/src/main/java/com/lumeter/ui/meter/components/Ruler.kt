@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.drop
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +41,7 @@ fun ValueRuler(
     currentIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    hapticEnabled: Boolean = true,
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val cell = 56.dp
@@ -47,6 +49,18 @@ fun ValueRuler(
         val pagerState = rememberPagerState(
             initialPage = currentIndex.coerceIn(0, entries.lastIndex),
         ) { entries.size }
+        val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+        androidx.compose.runtime.LaunchedEffect(pagerState, hapticEnabled) {
+            androidx.compose.runtime.snapshotFlow { pagerState.currentPage }
+                .drop(1)
+                .collect {
+                    if (hapticEnabled) {
+                        haptics.performHapticFeedback(
+                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                        )
+                    }
+                }
+        }
 
         // External value change (parameter cell tapped, mode swap) recenters the dial.
         LaunchedEffect(currentIndex) {

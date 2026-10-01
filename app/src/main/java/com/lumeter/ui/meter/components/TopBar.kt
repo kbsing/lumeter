@@ -1,6 +1,7 @@
 package com.lumeter.ui.meter.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,7 +11,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
@@ -26,6 +29,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.lumeter.R
 import com.lumeter.core.meter.MeteringMode
 import com.lumeter.data.SpotAggregation
 import com.lumeter.ui.AppPage
@@ -33,6 +38,7 @@ import com.lumeter.ui.AppViewModel
 import com.lumeter.ui.common.FormatUtils
 import com.lumeter.ui.theme.ColorAccent
 import com.lumeter.ui.theme.ColorBody
+import com.lumeter.ui.theme.ColorDanger
 import com.lumeter.ui.theme.ColorDim
 import com.lumeter.ui.theme.ColorInk
 import com.lumeter.ui.theme.ColorPanel
@@ -48,17 +54,17 @@ fun TopBar(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .background(ColorBody)
-            .statusBarsPadding()
+            .windowInsetsPadding(WindowInsets.displayCutout)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CompactToggle(
             label = when (vm.meteringMode) {
-                MeteringMode.MATRIX -> "MATRIX"
-                MeteringMode.CENTER -> "CENTER"
-                MeteringMode.SPOT -> "SPOT"
-                MeteringMode.MULTI -> "MULTI"
+                MeteringMode.MATRIX -> stringResource(R.string.metering_matrix).uppercase()
+                MeteringMode.CENTER -> stringResource(R.string.metering_center).uppercase()
+                MeteringMode.SPOT -> stringResource(R.string.metering_spot).uppercase()
+                MeteringMode.MULTI -> stringResource(R.string.metering_multi).uppercase()
             },
             sub = "METER",
             on = true,
@@ -158,24 +164,29 @@ fun MultiSpotInfo(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
+            // One-tap clear, visually louder than the aggregation chips.
             Text(
-                "CLEAR",
-                fontSize = 10.sp,
+                stringResource(R.string.clear).uppercase(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp,
-                color = ColorInk,
+                color = ColorDanger,
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
-                    .background(ColorBody.copy(alpha = 0.6f))
+                    .background(ColorBody.copy(alpha = 0.75f))
+                    .border(1.dp, ColorDanger, RoundedCornerShape(4.dp))
                     .clickable { vm.clearSpots() }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
             )
         }
         val spread = vm.spread
         Text(
             buildString {
-                append("${vm.spots.size}/${AppViewModel.MAX_SPOTS} SPOTS")
-                if (vm.spots.size > 1) append(" · RANGE ${FormatUtils.evText(spread)} EV")
-                if (vm.spots.isEmpty()) append(" · TAP TO ADD")
+                append("${vm.spots.size}/${AppViewModel.MAX_SPOTS} ${stringResource(R.string.spots).uppercase()}")
+                if (vm.spots.size > 1) {
+                    append(" · ${stringResource(R.string.range).uppercase()} ${FormatUtils.evText(spread)} EV")
+                }
+                if (vm.spots.isEmpty()) append(" · ${stringResource(R.string.tap_to_add).uppercase()}")
             },
             style = LabelTiny,
             color = ColorInk.copy(alpha = 0.8f),

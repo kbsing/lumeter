@@ -31,14 +31,18 @@ enum class AccentColor(val displayName: String, val color: Color) {
     PHOSPHOR("Phosphor", Color(0xFFB8F24A)),
 }
 
-// Top-level token aliases used by the screen components.
+// Top-level token aliases used by the screen components. The accent follows the
+// user-selected theme; everything else is static.
 val ColorBody = LumenPalette.Body
 val ColorPanel = LumenPalette.Panel
 val ColorPanel2 = LumenPalette.Panel2
 val ColorLine = LumenPalette.Line
 val ColorInk = LumenPalette.Ink
 val ColorDim = LumenPalette.Dim
-val ColorAccent = AccentColor.AMBER.color
+
+val ColorAccent: Color
+    @Composable get() = androidx.compose.material3.MaterialTheme.colorScheme.primary
+
 val ColorDanger = LumenPalette.Danger
 val ColorAccentPhosphor = AccentColor.PHOSPHOR.color
 val ColorAccentSignal = AccentColor.SIGNAL.color

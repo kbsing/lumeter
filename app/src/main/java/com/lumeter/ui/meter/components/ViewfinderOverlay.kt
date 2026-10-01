@@ -54,6 +54,8 @@ import com.lumeter.ui.theme.ColorPanel
 import com.lumeter.ui.theme.DisplayLarge
 import com.lumeter.ui.theme.DisplayMedium
 import com.lumeter.ui.theme.LabelTiny
+import androidx.compose.ui.res.stringResource
+import com.lumeter.R
 import com.lumeter.ui.theme.LumenPalette
 import kotlin.math.roundToInt
 
@@ -127,7 +129,7 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                 .padding(start = 16.dp, top = 16.dp),
         )
         Text(
-            "${vm.luxText} LUX",
+            "${vm.luxText} ${stringResource(R.string.lux)}",
             style = LabelTiny,
             color = ColorInk.copy(alpha = 0.8f),
             modifier = Modifier
@@ -154,29 +156,29 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
 
 @Composable
 private fun CornerMarks() {
-    val border = Modifier
-        .size(20.dp)
-        .border(1.5.dp, ColorInk.copy(alpha = 0.7f))
-    Box(Modifier.fillMaxSize()) {
-        Box(border.align(Alignment.TopStart).clip(RoundedCornerShape(topStart = 2.dp)))
-        Box(
-            Modifier
-                .align(Alignment.TopEnd)
-                .size(20.dp)
-                .border(1.5.dp, ColorInk.copy(alpha = 0.7f)),
+    // True L-shaped viewfinder corners (two strokes each), not square outlines.
+    val stroke = ColorInk.copy(alpha = 0.7f)
+    Canvas(Modifier.fillMaxSize()) {
+        val len = 20.dp.toPx()
+        val w = 2.dp.toPx()
+        val m = 14.dp.toPx()
+        val corners = listOf(
+            Offset(m, m) to listOf(Offset(1f, 0f), Offset(0f, 1f)),
+            Offset(size.width - m, m) to listOf(Offset(-1f, 0f), Offset(0f, 1f)),
+            Offset(m, size.height - m) to listOf(Offset(1f, 0f), Offset(0f, -1f)),
+            Offset(size.width - m, size.height - m) to listOf(Offset(-1f, 0f), Offset(0f, -1f)),
         )
-        Box(
-            Modifier
-                .align(Alignment.BottomStart)
-                .size(20.dp)
-                .border(1.5.dp, ColorInk.copy(alpha = 0.7f)),
-        )
-        Box(
-            Modifier
-                .align(Alignment.BottomEnd)
-                .size(20.dp)
-                .border(1.5.dp, ColorInk.copy(alpha = 0.7f)),
-        )
+        corners.forEach { (corner, dirs) ->
+            dirs.forEach { dir ->
+                drawLine(
+                    color = stroke,
+                    start = corner,
+                    end = Offset(corner.x + dir.x * len, corner.y + dir.y * len),
+                    strokeWidth = w,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                )
+            }
+        }
     }
 }
 
@@ -310,9 +312,9 @@ private fun StatusLine(vm: AppViewModel, modifier: Modifier = Modifier) {
         Spacer(Modifier.width(6.dp))
         Text(
             when {
-                vm.aeHold -> "LOCKED"
-                vm.liveMetering -> "LIVE"
-                else -> "PAUSED"
+                vm.aeHold -> stringResource(R.string.locked)
+                vm.liveMetering -> stringResource(R.string.live)
+                else -> stringResource(R.string.paused)
             } + (if (vm.ndFilter > 0) " · ND${vm.ndFilter}" else ""),
             style = LabelTiny,
             color = ColorInk.copy(alpha = 0.8f),
@@ -324,9 +326,9 @@ private fun StatusLine(vm: AppViewModel, modifier: Modifier = Modifier) {
 private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
     val solver = vm.solverResult
     val rightLabel = when (vm.exposureMode) {
-        ExposureMode.APERTURE_PRIORITY -> "SHUTTER"
-        ExposureMode.SHUTTER_PRIORITY -> "APERTURE"
-        ExposureMode.MANUAL -> "EXPOSURE"
+        ExposureMode.APERTURE_PRIORITY -> stringResource(R.string.shutter).uppercase()
+        ExposureMode.SHUTTER_PRIORITY -> stringResource(R.string.aperture).uppercase()
+        ExposureMode.MANUAL -> stringResource(R.string.exposure).uppercase()
     }
     val rightValue = when (vm.exposureMode) {
         ExposureMode.APERTURE_PRIORITY ->
@@ -353,7 +355,7 @@ private fun ReadoutPanel(vm: AppViewModel, modifier: Modifier = Modifier) {
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
             Column {
-                Text("EV @ ISO 100", style = LabelTiny, color = ColorDim)
+                Text(stringResource(R.string.ev_iso_100), style = LabelTiny, color = ColorDim)
                 Text(
                     FormatUtils.evText(vm.ev100),
                     style = DisplayLarge,
@@ -384,6 +386,8 @@ fun ExposureScaleCanvas(needle: Double, matched: Boolean, modifier: Modifier = M
         animationSpec = tween(150),
         label = "needle",
     )
+    // Resolve the themed accent here: Canvas's draw scope is not composable.
+    val accent = ColorAccent
     Column(modifier) {
         Canvas(
             Modifier
@@ -405,13 +409,13 @@ fun ExposureScaleCanvas(needle: Double, matched: Boolean, modifier: Modifier = M
             val x = ((animated + 3f) / 6f) * size.width
             // Soft glow under the needle, then the crisp needle.
             drawLine(
-                color = ColorAccent.copy(alpha = 0.35f),
+                color = accent.copy(alpha = 0.35f),
                 start = Offset(x, 0f),
                 end = Offset(x, size.height),
                 strokeWidth = 5.dp.toPx(),
             )
             drawLine(
-                color = ColorAccent,
+                color = accent,
                 start = Offset(x, 0f),
                 end = Offset(x, size.height),
                 strokeWidth = 2.dp.toPx(),

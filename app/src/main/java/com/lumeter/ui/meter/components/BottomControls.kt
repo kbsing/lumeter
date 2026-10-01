@@ -22,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import com.lumeter.R
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -125,7 +127,7 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             }
 
             ParameterCell(
-                label = "ISO",
+                label = stringResource(R.string.iso).uppercase(),
                 value = vm.userIso.toString(),
                 active = vm.activeField == ActiveField.ISO,
                 locked = false,
@@ -133,16 +135,16 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                 onClick = { tick(); vm.setActiveField(ActiveField.ISO) },
             )
             ParameterCell(
-                label = "APERTURE",
-                value = if (apertureLocked) "AUTO" else FormatUtils.aperture(apertureValue),
+                label = stringResource(R.string.aperture).uppercase(),
+                value = if (apertureLocked) stringResource(R.string.auto).uppercase() else FormatUtils.aperture(apertureValue),
                 active = vm.activeField == ActiveField.APERTURE,
                 locked = apertureLocked,
                 modifier = Modifier.weight(1f),
                 onClick = { tick(); vm.setActiveField(ActiveField.APERTURE) },
             )
             ParameterCell(
-                label = "SHUTTER",
-                value = if (shutterLocked) "AUTO" else FormatUtils.shutter(shutterValue),
+                label = stringResource(R.string.shutter).uppercase(),
+                value = if (shutterLocked) stringResource(R.string.auto).uppercase() else FormatUtils.shutter(shutterValue),
                 active = vm.activeField == ActiveField.SHUTTER,
                 locked = shutterLocked,
                 modifier = Modifier.weight(1f),
@@ -167,7 +169,7 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                     .padding(vertical = 20.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("AUTO", style = LabelTiny, color = ColorDim)
+                Text(stringResource(R.string.auto).uppercase(), style = LabelTiny, color = ColorDim)
             }
         } else {
             when (vm.activeField) {
@@ -175,68 +177,83 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                     entries = ExposureSolver.ISOS.map { it.toString() },
                     currentIndex = ExposureSolver.ISOS.indexOf(vm.userIso).coerceAtLeast(0),
                     onSelect = { tick(); vm.setIso(ExposureSolver.ISOS[it]) },
+                    hapticEnabled = vm.hapticFeedback,
                 )
                 ActiveField.APERTURE -> ValueRuler(
                     entries = ExposureSolver.APERTURES.map { RulerLabels.aperture(it) },
                     currentIndex = nearestApertureIndex(vm.userAperture),
                     onSelect = { tick(); vm.setAperture(ExposureSolver.APERTURES[it]) },
+                    hapticEnabled = vm.hapticFeedback,
                 )
                 ActiveField.SHUTTER -> ValueRuler(
                     entries = ExposureSolver.SHUTTERS.map { RulerLabels.shutter(it) },
                     currentIndex = nearestShutterIndex(vm.userShutter),
                     onSelect = { tick(); vm.setShutter(ExposureSolver.SHUTTERS[it]) },
+                    hapticEnabled = vm.hapticFeedback,
                 )
             }
         }
 
         Spacer(Modifier.height(10.dp))
 
-        // Pause / shutter ring / log
+        // Log reading (left) / pause-or-single-shot (center) / reading count (right)
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier.width(80.dp),
-            ) {
-                Text(
-                    if (vm.liveMetering) "❚❚ PAUSE" else "▶ RESUME",
-                    style = LabelTiny,
-                    color = ColorDim,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { tick(); vm.toggleLiveMetering() }
-                        .padding(4.dp),
-                )
-            }
-            ShutterRing(
-                onClick = {
-                    tick()
-                    val solver = vm.solverResult
-                    val ev = vm.ev100 ?: return@ShutterRing
-                    val ap = when (vm.exposureMode) {
-                        ExposureMode.SHUTTER_PRIORITY -> solver?.apertureSnapped ?: vm.userAperture
-                        else -> vm.userAperture
+            Text(
+                "◉ " + stringResource(R.string.log_reading).uppercase(),
+                style = LabelTiny,
+                color = ColorInk,
+                modifier = Modifier
+                    .width(96.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable {
+                        tick()
+                        val solver = vm.solverResult
+                        val ev = vm.ev100 ?: return@clickable
+                        val ap = when (vm.exposureMode) {
+                            ExposureMode.SHUTTER_PRIORITY -> solver?.apertureSnapped ?: vm.userAperture
+                            else -> vm.userAperture
+                        }
+                        val sh = when (vm.exposureMode) {
+                            ExposureMode.APERTURE_PRIORITY -> solver?.shutterSnapped ?: vm.userShutter
+                            else -> vm.userShutter
+                        }
+                        vm.logReading(ev, ap, sh)
                     }
-                    val sh = when (vm.exposureMode) {
-                        ExposureMode.APERTURE_PRIORITY -> solver?.shutterSnapped ?: vm.userShutter
-                        else -> vm.userShutter
-                    }
-                    vm.logReading(ev, ap, sh)
-                },
+                    .padding(vertical = 6.dp),
             )
-            // Passive reading count: history is reached from the top bar only.
+
+            // Small action circle: pause when live, take one reading when paused.
             Box(
-                Modifier.width(80.dp),
-                contentAlignment = Alignment.CenterEnd,
+                Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(ColorInk.copy(alpha = 0.08f))
+                    .border(1.5.dp, ColorInk.copy(alpha = 0.8f), CircleShape)
+                    .clickable {
+                        tick()
+                        if (vm.liveMetering) vm.toggleLiveMetering() else vm.singleShot()
+                    },
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "· ${vm.logEntries.size} ·",
-                    style = LabelTiny,
-                    color = ColorDim.copy(alpha = 0.7f),
+                    if (vm.liveMetering) "❚❚" else "●",
+                    color = ColorAccent,
+                    fontSize = if (vm.liveMetering) 14.sp else 20.sp,
                 )
             }
+
+            // Passive reading count: history is reached from the top bar only.
+            Text(
+                "· ${vm.logEntries.size} ·",
+                style = LabelTiny,
+                color = ColorDim.copy(alpha = 0.7f),
+                modifier = Modifier.width(96.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            )
         }
     }
 }
@@ -245,7 +262,7 @@ fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
 private fun ExpCompControl(vm: AppViewModel, tick: () -> Unit) {
     val step = if (vm.thirdStopIncrements) 1.0 / 3.0 else 0.5
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("EXP COMP", style = LabelTiny, color = ColorDim)
+        Text(stringResource(R.string.exp_comp).uppercase(), style = LabelTiny, color = ColorDim)
         Spacer(Modifier.width(8.dp))
         Box(
             Modifier
@@ -303,26 +320,6 @@ private fun ParameterCell(
             value,
             style = DisplayCell,
             color = if (locked) ColorInk.copy(alpha = 0.5f) else ColorInk,
-        )
-    }
-}
-
-@Composable
-private fun ShutterRing(onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(72.dp)
-            .clip(CircleShape)
-            .background(ColorInk.copy(alpha = 0.1f))
-            .border(2.dp, ColorInk.copy(alpha = 0.8f), CircleShape)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(ColorInk),
         )
     }
 }
