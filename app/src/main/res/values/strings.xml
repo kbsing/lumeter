@@ -95,7 +95,7 @@
     <string name="accent_colour">Accent colour</string>
     <string name="calibration_menu">Calibration</string>
     <string name="calibration_desc">Sensor offset and reflected-light constant.</string>
-    <string name="version">LUMEN MK·I — v0.3.0</string>
+    <string name="version">LUMEN MK·I — v0.6.0</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">Amber</string>
@@ -123,4 +123,44 @@
     <string name="scale_limit">Scale limit</string>
     <string name="delete_confirm">Delete this reading?</string>
     <string name="cancel">Cancel</string>
+
+    <!-- Zone System -->
+    <string name="zone">ZONE</string>
+    <string name="zone_d0">Pure black, no detail</string>
+    <string name="zone_d1">Near black, first hint of detail</string>
+    <string name="zone_d2">Dark shadow with texture</string>
+    <string name="zone_d3">Typical shadow, full texture</string>
+    <string name="zone_d4">Dark foliage, dark stone</string>
+    <string name="zone_d5">Middle gray, 18%</string>
+    <string name="zone_d6">Light skin tone</string>
+    <string name="zone_d7">Light gray, bright texture</string>
+    <string name="zone_d8">Near white with texture</string>
+    <string name="zone_d9">Paper white, texture gone</string>
+    <string name="zone_d10">Pure white</string>
+
+    <!-- Tools -->
+    <string name="tools">Tools</string>
+    <string name="tool_film">Film</string>
+    <string name="tool_reciprocity">Reciprocity failure</string>
+    <string name="tool_corrected">Corrected</string>
+    <string name="tool_correction">Correction</string>
+    <string name="tool_flash">Flash</string>
+    <string name="tool_dof">Depth of field</string>
+    <string name="tool_near">Near</string>
+    <string name="tool_far">Far</string>
+    <string name="tool_hyperfocal">Hyperfocal</string>
+    <string name="tool_latitude">Film latitude</string>
+    <string name="tool_highlight_headroom">Highlights</string>
+    <string name="tool_shadow_headroom">Shadows</string>
+    <string name="tool_scene_range">Range</string>
+    <string name="tool_need_spots">Add two or more MULTI spots to measure the scene range.</string>
+    <string name="tool_clips">Highlights would clip at this placement.</string>
+    <string name="tool_blocks">Shadows would block up at this placement.</string>
+    <string name="tool_fits">The scene fits this film\'s latitude.</string>
+    <string name="tool_range_exceeds">Scene range exceeds the film\'s latitude.</string>
+
+    <!-- RAW metering -->
+    <string name="raw_metering">RAW metering</string>
+    <string name="raw_metering_desc">Meter straight from Bayer sensor data, bypassing the ISP tone curve. Falls back to the standard YUV path when unsupported.</string>
+    <string name="raw_unavailable">RAW unavailable (%1$s) — using YUV.</string>
 </resources>

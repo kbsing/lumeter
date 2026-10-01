@@ -39,7 +39,12 @@ data class MeteringFrameStat(
     val appliedUserCorrectionEv: Double = 0.0,
 )
 
-data class MeterReading(
+/**
+ * Fused output of the metering chain (median over the stable-frame ring). Named apart
+ * from core.exposure's L2 [com.lumeter.core.exposure.MeterReading] on purpose: the
+ * layers talk through one number (EV100), not through shared types.
+ */
+data class FusedReading(
     val sceneEv100: Double,
     val rawLuma: Double,
     val clippedFraction: Double,

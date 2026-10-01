@@ -105,6 +105,18 @@ fun SettingsPage(
                 checked = appViewModel.hapticFeedback,
                 onCheckedChange = { appViewModel.setHapticFeedback(!appViewModel.hapticFeedback) }
             )
+
+            // RAW metering source
+            SettingToggle(
+                title = stringResource(R.string.raw_metering),
+                description = if (appViewModel.rawError != null) {
+                    stringResource(R.string.raw_unavailable, appViewModel.rawError ?: "")
+                } else {
+                    stringResource(R.string.raw_metering_desc)
+                },
+                checked = appViewModel.rawMode,
+                onCheckedChange = { tick(); appViewModel.toggleRawMode() }
+            )
             
             Spacer(Modifier.height(8.dp))
             

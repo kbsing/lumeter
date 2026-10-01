@@ -12,10 +12,10 @@ import kotlin.math.abs
  */
 object MeteringFusion {
 
-    fun fuse(stats: List<MeteringFrameStat>, source: MeteringSource): MeterReading? {
+    fun fuse(stats: List<MeteringFrameStat>, source: MeteringSource): FusedReading? {
         if (stats.isEmpty()) return null
         val representative = stats[stats.size / 2]
-        return MeterReading(
+        return FusedReading(
             sceneEv100 = median(stats.map(MeteringFrameStat::ev100).sorted()),
             rawLuma = median(stats.map(MeteringFrameStat::luma).sorted()),
             clippedFraction = stats.map(MeteringFrameStat::clipped).average(),

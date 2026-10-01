@@ -16,6 +16,7 @@ import com.lumeter.ui.screens.FilmPage
 import com.lumeter.ui.screens.HistoryPage
 import com.lumeter.ui.screens.MeterPage
 import com.lumeter.ui.screens.SettingsPage
+import com.lumeter.ui.screens.ToolsPage
 import com.lumeter.ui.theme.LumenTheme
 
 /**
@@ -60,6 +61,10 @@ fun LumeterApp(appViewModel: AppViewModel = viewModel()) {
                         onBack = { appViewModel.navigateTo(AppPage.METER) },
                     )
                     AppPage.FILM -> FilmPage(
+                        appViewModel = appViewModel,
+                        onBack = { appViewModel.navigateTo(AppPage.METER) },
+                    )
+                    AppPage.TOOLS -> ToolsPage(
                         appViewModel = appViewModel,
                         onBack = { appViewModel.navigateTo(AppPage.METER) },
                     )

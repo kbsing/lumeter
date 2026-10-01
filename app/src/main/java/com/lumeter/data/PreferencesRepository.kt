@@ -32,6 +32,9 @@ class PreferencesRepository(private val context: Context) {
         // UI settings
         private val ACCENT_COLOR = stringPreferencesKey("accent_color")
         private val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
+
+        // Metering source
+        private val RAW_MODE = booleanPreferencesKey("raw_mode")
     }
 
     // Read preferences
@@ -50,6 +53,7 @@ class PreferencesRepository(private val context: Context) {
             kConstant = prefs[K_CONSTANT] ?: 12.5,
             accentName = prefs[ACCENT_COLOR] ?: "AMBER",
             hapticsEnabled = prefs[HAPTICS_ENABLED] ?: true,
+            rawMode = prefs[RAW_MODE] ?: false,
         )
     }
 
@@ -78,6 +82,8 @@ class PreferencesRepository(private val context: Context) {
     suspend fun setAccentColor(name: String) = edit { it[ACCENT_COLOR] = name }
 
     suspend fun setHapticsEnabled(enabled: Boolean) = edit { it[HAPTICS_ENABLED] = enabled }
+
+    suspend fun setRawMode(enabled: Boolean) = edit { it[RAW_MODE] = enabled }
 
     suspend fun resetCalibration() = edit {
         it[CALIBRATION_OFFSET] = 0.0

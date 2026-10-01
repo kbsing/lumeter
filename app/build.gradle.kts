@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -14,8 +16,25 @@ android {
         applicationId = "com.lumeter"
         minSdk = 28
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.6.0"
+    }
+
+    val signing = Properties().apply {
+        val props = rootProject.file("local.properties")
+        if (props.exists()) props.inputStream().use { load(it) }
+    }
+
+    signingConfigs {
+        create("release") {
+            val store = signing.getProperty("lumeter.release.store")
+            if (store != null) {
+                storeFile = file(store)
+                storePassword = signing.getProperty("lumeter.release.storePassword")
+                keyAlias = signing.getProperty("lumeter.release.keyAlias")
+                keyPassword = signing.getProperty("lumeter.release.keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -26,6 +45,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

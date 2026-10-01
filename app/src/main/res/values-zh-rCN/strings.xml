@@ -95,7 +95,7 @@
     <string name="accent_colour">主题色</string>
     <string name="calibration_menu">校准</string>
     <string name="calibration_desc">传感器偏移和反射光常数。</string>
-    <string name="version">LUMEN MK·I — v0.3.0</string>
+    <string name="version">LUMEN MK·I — v0.6.0</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">琥珀</string>
@@ -123,4 +123,44 @@
     <string name="scale_limit">档位限制</string>
     <string name="delete_confirm">删除这条测光记录？</string>
     <string name="cancel">取消</string>
+
+    <!-- Zone System -->
+    <string name="zone">ZONE</string>
+    <string name="zone_d0">纯黑,无细节</string>
+    <string name="zone_d1">近黑,细节初现</string>
+    <string name="zone_d2">暗部,有纹理</string>
+    <string name="zone_d3">典型暗部,纹理完整</string>
+    <string name="zone_d4">深色树叶、深色石头</string>
+    <string name="zone_d5">中灰(18%)</string>
+    <string name="zone_d6">浅色皮肤</string>
+    <string name="zone_d7">亮灰,明亮纹理</string>
+    <string name="zone_d8">近白,仍有纹理</string>
+    <string name="zone_d9">纸白,纹理尽失</string>
+    <string name="zone_d10">纯白</string>
+
+    <!-- Tools -->
+    <string name="tools">工具</string>
+    <string name="tool_film">胶片</string>
+    <string name="tool_reciprocity">倒易率失效</string>
+    <string name="tool_corrected">校正曝光</string>
+    <string name="tool_correction">补偿</string>
+    <string name="tool_flash">闪光灯</string>
+    <string name="tool_dof">景深</string>
+    <string name="tool_near">近界</string>
+    <string name="tool_far">远界</string>
+    <string name="tool_hyperfocal">超焦距</string>
+    <string name="tool_latitude">胶片宽容度</string>
+    <string name="tool_highlight_headroom">高光</string>
+    <string name="tool_shadow_headroom">暗部</string>
+    <string name="tool_scene_range">光比</string>
+    <string name="tool_need_spots">在 MULTI 模式添加两个以上标点以测量场景光比。</string>
+    <string name="tool_clips">此放置下高光将溢出。</string>
+    <string name="tool_blocks">此放置下暗部将死黑。</string>
+    <string name="tool_fits">场景在该胶片宽容度范围内。</string>
+    <string name="tool_range_exceeds">场景光比超出该胶片宽容度。</string>
+
+    <!-- RAW metering -->
+    <string name="raw_metering">RAW 测光</string>
+    <string name="raw_metering_desc">直接从 Bayer 传感器数据测光,绕过 ISP 色调曲线。设备不支持时自动回退 YUV 路径。</string>
+    <string name="raw_unavailable">RAW 不可用(%1$s),已回退 YUV。</string>
 </resources>

@@ -95,7 +95,7 @@
     <string name="accent_colour">主題色</string>
     <string name="calibration_menu">校準</string>
     <string name="calibration_desc">感測器偏移和反射光常數。</string>
-    <string name="version">LUMEN MK·I — v0.3.0</string>
+    <string name="version">LUMEN MK·I — v0.6.0</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">琥珀</string>
@@ -123,4 +123,44 @@
     <string name="scale_limit">檔位限制</string>
     <string name="delete_confirm">刪除這條測光記錄？</string>
     <string name="cancel">取消</string>
+
+    <!-- Zone System -->
+    <string name="zone">ZONE</string>
+    <string name="zone_d0">純黑,無細節</string>
+    <string name="zone_d1">近黑,細節初現</string>
+    <string name="zone_d2">暗部,有紋理</string>
+    <string name="zone_d3">典型暗部,紋理完整</string>
+    <string name="zone_d4">深色樹葉、深色石頭</string>
+    <string name="zone_d5">中灰(18%)</string>
+    <string name="zone_d6">淺色皮膚</string>
+    <string name="zone_d7">亮灰,明亮紋理</string>
+    <string name="zone_d8">近白,仍有紋理</string>
+    <string name="zone_d9">紙白,紋理盡失</string>
+    <string name="zone_d10">純白</string>
+
+    <!-- Tools -->
+    <string name="tools">工具</string>
+    <string name="tool_film">膠片</string>
+    <string name="tool_reciprocity">倒易率失效</string>
+    <string name="tool_corrected">校正曝光</string>
+    <string name="tool_correction">補償</string>
+    <string name="tool_flash">閃光燈</string>
+    <string name="tool_dof">景深</string>
+    <string name="tool_near">近界</string>
+    <string name="tool_far">遠界</string>
+    <string name="tool_hyperfocal">超焦距</string>
+    <string name="tool_latitude">膠片寬容度</string>
+    <string name="tool_highlight_headroom">高光</string>
+    <string name="tool_shadow_headroom">暗部</string>
+    <string name="tool_scene_range">光比</string>
+    <string name="tool_need_spots">在 MULTI 模式加入兩個以上標點以測量場景光比。</string>
+    <string name="tool_clips">此放置下高光將溢出。</string>
+    <string name="tool_blocks">此放置下暗部將死黑。</string>
+    <string name="tool_fits">場景在該膠片寬容度範圍內。</string>
+    <string name="tool_range_exceeds">場景光比超出該膠片寬容度。</string>
+
+    <!-- RAW metering -->
+    <string name="raw_metering">RAW 測光</string>
+    <string name="raw_metering_desc">直接從 Bayer 感光元件數據測光,繞過 ISP 色調曲線。裝置不支援時自動回退 YUV 路徑。</string>
+    <string name="raw_unavailable">RAW 不可用(%1$s),已回退 YUV。</string>
 </resources>

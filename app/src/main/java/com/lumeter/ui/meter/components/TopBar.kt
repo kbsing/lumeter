@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
@@ -93,6 +94,7 @@ fun TopBar(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
         Spacer(Modifier.weight(1f))
         IconEntry(Icons.Outlined.History, "history") { vm.navigateTo(AppPage.HISTORY) }
         IconEntry(Icons.Outlined.Movie, "film") { vm.navigateTo(AppPage.FILM) }
+        IconEntry(Icons.Outlined.Calculate, "tools") { vm.navigateTo(AppPage.TOOLS) }
         IconEntry(Icons.Outlined.Settings, "settings") { vm.navigateTo(AppPage.SETTINGS) }
     }
 }
@@ -147,6 +149,7 @@ fun LeftRail(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
         Spacer(Modifier.weight(1f))
         IconEntry(Icons.Outlined.History, "history") { vm.navigateTo(AppPage.HISTORY) }
         IconEntry(Icons.Outlined.Movie, "film") { vm.navigateTo(AppPage.FILM) }
+        IconEntry(Icons.Outlined.Calculate, "tools") { vm.navigateTo(AppPage.TOOLS) }
         IconEntry(Icons.Outlined.Settings, "settings") { vm.navigateTo(AppPage.SETTINGS) }
     }
 }

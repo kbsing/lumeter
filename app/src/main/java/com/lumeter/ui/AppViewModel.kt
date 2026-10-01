@@ -20,6 +20,7 @@ import com.lumeter.core.exposure.MeterReading
 import com.lumeter.core.exposure.ReadingInvalidReason
 import com.lumeter.core.exposure.ResultKind
 import com.lumeter.core.meter.MeteringMode
+import com.lumeter.core.meter.ZoneMath
 import com.lumeter.data.ActiveField
 import com.lumeter.data.FilmStock
 import com.lumeter.data.PreferencesRepository
@@ -72,6 +73,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var rotationDegrees by mutableStateOf(0)
         private set
+    /** RAW mode preview buffer dims for the TextureView fill-center matrix. */
+    var previewWidth by mutableStateOf(0)
+        private set
+    var previewHeight by mutableStateOf(0)
+        private set
 
     // Metering control
     private var _meteringMode by mutableStateOf(MeteringMode.MATRIX)
@@ -105,6 +111,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var _spotAggregation by mutableStateOf(SpotAggregation.AVG)
     val spotAggregation: SpotAggregation get() = _spotAggregation
 
+    // Zone System
+    private var _zoneEnabled by mutableStateOf(false)
+    val zoneEnabled: Boolean get() = _zoneEnabled
+    private var _placedZone by mutableStateOf(ZoneMath.MID_ZONE)
+    val placedZone: Int get() = _placedZone
+
     // History
     var logEntries by mutableStateOf<List<Reading>>(emptyList())
         private set
@@ -124,6 +136,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val calOffset: Double get() = _calOffset
     private var _kConstant by mutableStateOf(12.5)
     val kConstant: Double get() = _kConstant
+
+    // RAW metering source
+    /** User intent (settings switch); the session may fail to open on unsupported devices. */
+    var rawMode by mutableStateOf(false)
+        private set
+    /** True once the RAW Camera2 session is actually delivering frames. */
+    var rawActive by mutableStateOf(false)
+        private set
+    /** Last RAW failure reason; non-null implies the UI fell back to YUV. */
+    var rawError by mutableStateOf<String?>(null)
+        private set
 
     /** Bottom parameter panel expansion (session state). */
     var controlsExpanded by mutableStateOf(true)
@@ -156,6 +179,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val multiActive: Boolean get() = meteringMode == MeteringMode.MULTI
 
+    /** Zone placement shift: placing above V gives MORE light (EV100 recommendation drops). */
+    private val zoneOffset: Double
+        get() = if (_zoneEnabled) ZoneMath.evShiftForPlacement(_placedZone) else 0.0
+
     private val aggOffset: Double
         get() {
             if (!multiActive || engineSpotEvs.isEmpty()) return 0.0
@@ -185,7 +212,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             aperture = userAperture,
             shutter = userShutter,
             iso = userIso,
-            biasStops = expComp - multi,
+            biasStops = expComp - multi + zoneOffset,
             ndStops = ndFilter,
         )
     }
@@ -238,6 +265,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _hapticFeedback = p.hapticsEnabled
         _accentColor = AccentColor.entries.firstOrNull { it.name == p.accentName }
             ?: AccentColor.AMBER
+        rawMode = p.rawMode
     }
 
     private var preferencesLoaded = false
@@ -252,9 +280,49 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * RAW handover: called by the viewfinder's TextureView once its surface is ready.
+     * Success flips [rawActive]; any failure tears the session down and falls back to
+     * the YUV path, persisting the off state so the next launch does not retry blindly.
+     */
+    fun startRawCamera(surfaceTexture: android.graphics.SurfaceTexture) {
+        if (rawActive || !rawMode) return
+        cameraManager.startRaw(
+            surfaceTexture = surfaceTexture,
+            meteringMode = meteringMode,
+            live = continuous,
+            onState = ::onEngineState,
+            onReady = {
+                rawActive = true
+                rawError = null
+            },
+            onFallback = { reason ->
+                rawActive = false
+                rawError = reason
+                if (rawMode) {
+                    rawMode = false
+                    viewModelScope.launch { runCatching { prefs.setRawMode(false) } }
+                }
+            },
+        )
+    }
+
+    fun toggleRawMode() {
+        rawError = null
+        if (!rawMode) {
+            rawMode = true
+        } else {
+            rawMode = false
+            cameraManager.stopRaw()
+            rawActive = false
+        }
+        viewModelScope.launch { runCatching { prefs.setRawMode(rawMode) } }
+    }
+
     fun pushEngineSpots(frameSpots: List<Pair<Float, Float>>) {
-        cameraManager.analyzer?.spots =
-            frameSpots.map { MeterSpot(it.first, it.second) }
+        val mapped = frameSpots.map { MeterSpot(it.first, it.second) }
+        cameraManager.analyzer?.spots = mapped
+        cameraManager.rawMeterSource?.spots = mapped
     }
 
     private var lastEmitNanos = 0L
@@ -273,6 +341,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         analysisWidth = state.analysisWidth
         analysisHeight = state.analysisHeight
         rotationDegrees = state.rotationDegrees
+        previewWidth = state.previewWidth
+        previewHeight = state.previewHeight
 
         val ev = sceneEv
         if (continuous) {
@@ -312,9 +382,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         currentPage = page
     }
 
+    // Zone System
+
+    fun toggleZone() {
+        _zoneEnabled = !_zoneEnabled
+    }
+
+    fun setPlacedZone(zone: Int) {
+        _placedZone = zone.coerceIn(0, ZoneMath.ZONE_COUNT - 1)
+    }
+
+    /**
+     * Where each MULTI spot lands on the zone scale once the placed EV is shot: zone V
+     * is whatever the final recommended EV renders mid-gray.
+     */
+    val spotZones: List<Double>
+        get() {
+            val base = sceneEv ?: return emptyList()
+            val anchor = base + zoneOffset
+            return spotDisplayEvs.map { ZoneMath.zoneForSpot(it, anchor) }
+        }
+
     fun setMeteringMode(mode: MeteringMode) {
         _meteringMode = mode
         cameraManager.analyzer?.meteringMode = mode
+        cameraManager.rawMeterSource?.meteringMode = mode
         if (mode != MeteringMode.MULTI) {
             spots = emptyList()
             pushEngineSpots(emptyList())
@@ -337,6 +429,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             measuring = false
         }
         cameraManager.analyzer?.live = continuous
+        cameraManager.rawMeterSource?.live = continuous
     }
 
     /**
@@ -349,6 +442,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         measuring = true
         frozenReading = null
         cameraManager.analyzer?.oneShot = true
+        cameraManager.rawMeterSource?.oneShot = true
         viewModelScope.launch {
             delay(MEASURE_TIMEOUT_MS)
             if (measuring) {
@@ -511,6 +605,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        cameraManager.stopRaw()
         cameraManager.stop()
         super.onCleared()
     }
@@ -534,6 +629,7 @@ enum class AppPage {
     METER,
     HISTORY,
     FILM,
+    TOOLS,
     SETTINGS,
     CALIBRATION,
 }

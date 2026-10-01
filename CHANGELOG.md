@@ -1,0 +1,41 @@
+# Changelog
+
+## 0.6.0 — 2026-10-02
+
+### Zone System (v0.4)
+
+- 新增 ZoneMath 内核:置区反推(把测光区放到指定区,反算曝光)与标点分区计算。
+- 读数面板新增 ZONE 条:11 格 0–X 置区选择,附当前区描述;启用后 MULTI 标点芯片显示所在区(罗马数字)。
+- 内核收敛:core/meter 测光输出更名 `FusedReading`,与 core/exposure 的 L2 `MeterReading` 不再同名;删除无生产引用的 `ExposureMath`;MULTI 标点改为绘制在读数面板之上(修复遮挡)。
+
+### 工具面板 (v0.5)
+
+- 新增 ToolsPage:倒易率校正、闪光指数(GN/距离/光圈互算)、景深(超焦距/近远界/COC 预设)、胶片宽容度评估。
+- 胶片库 28 款全部补倒易率幂律模型(阈值模型,由公开数据拟合)与宽容度参数;宽容度卡联动 MULTI 场景光比给出高光/暗部余量。
+
+### RAW 测光 (v0.6)
+
+- 新增 RAW_SENSOR 测光内核:Camera2 直连会话(预览 + RAW 流),Bayer 域四通道中值统计,黑位/白位归一,可选按 HAL 色彩校正矩阵换算亮度。
+- 绕过 ISP tonemap,根治 tonemap=FAST 回退 sRGB 设备的系统性 EV 偏差;稳定性门/中值融合与 YUV 路径共用一套 ReadingAccumulator。
+- 设置页新增 RAW 测光开关;取景器显示 RAW 徽标;不支持 RAW 的设备自动回退 YUV 并提示。
+- 稳定读数策略抽出为 YUV/RAW 共用的 ReadingAccumulator。
+
+### 工程与发布
+
+- release 签名配置(keystore 在仓库外,经 local.properties 注入)。
+- versionCode 4;README 功能清单更新。
+
+## 0.3.0 — 2026-10-02
+
+- 按 layering spec 重构测光逻辑(core/meter:tonemap 反演链);core/exposure 保留为 A/S/M 求解器。
+- 真横屏 UI(左工具栏 | 取景器 | 控制面板 | 右动作栏)、等效曝光对、1/3 档光圈(f/0.95 起)、删除确认、胶片库扩到 28 款、Measure 键状态化、主按钮改纯暂停/恢复。
+
+## 0.2.0 — 2026-10-01
+
+- LUMEN MK·I 参考设计整体重构:暖黑暗色系 + Barlow Condensed/DM Mono、三段式主屏。
+- 四种测光模式(MATRIX/CENTER/SPOT/MULTI 多点 ROI)、A/S/M 曝光模型、AE-L/HOLD、ND 补偿、Room 历史、校准(±2 EV + K 常数)、胶片库、四语言、三色主题。
+- 修复 AE 稳态判定(±1/24 EV HAL 抖动容差)。
+
+## 0.1.0 — 2026-10-01
+
+- M1:YUV 测光内核(Camera2Interop 时间戳配对 + tonemap 反演 + 中值融合)与 Compose 暗色 UI。

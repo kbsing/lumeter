@@ -39,9 +39,13 @@ class CameraManager(private val context: Context) {
     private var provider: ProcessCameraProvider? = null
     private var executor: ExecutorService? = null
     private var analysis: ImageAnalysis? = null
+    private var rawSource: RawMeterSource? = null
 
     var analyzer: MeterAnalyzer? = null
         private set
+
+    val rawMeterSource: RawMeterSource?
+        get() = rawSource
 
     @OptIn(ExperimentalCamera2Interop::class)
     fun start(
@@ -49,6 +53,7 @@ class CameraManager(private val context: Context) {
         previewView: PreviewView,
         onState: (MeterEngineState) -> Unit,
     ) {
+        if (rawSource != null) stopRaw() // leaving RAW mode hands the camera back to CameraX
         if (analyzer == null) {
             executor = Executors.newSingleThreadExecutor()
             analyzer = MeterAnalyzer(
@@ -123,7 +128,49 @@ class CameraManager(private val context: Context) {
         provider = null
     }
 
-    @OptIn(ExperimentalCamera2Interop::class)
+    /**
+     * RAW mode takes over the camera from CameraX: the YUV binding is released first
+     * (CameraX close completes asynchronously, the RAW open retries around it), then a
+     * Camera2 session meters RAW_SENSOR frames through [RawMeterSource]. The current
+     * mode/live flags travel with the call so the handover keeps metering semantics.
+     */
+    fun startRaw(
+        surfaceTexture: android.graphics.SurfaceTexture,
+        meteringMode: com.lumeter.core.meter.MeteringMode,
+        live: Boolean,
+        onState: (MeterEngineState) -> Unit,
+        onReady: () -> Unit,
+        onFallback: (String) -> Unit,
+    ) {
+        unbindForRaw()
+        val source = rawSource ?: RawMeterSource(
+            context = context,
+            onState = onState,
+            onError = { reason ->
+                rawSource?.stop()
+                onFallback(reason)
+            },
+        ).also { rawSource = it }
+        source.meteringMode = meteringMode
+        source.live = live
+        source.start(surfaceTexture, onReady)
+    }
+
+    private fun unbindForRaw() {
+        runCatching { provider?.unbindAll() }
+        resultStore.clear()
+        executor?.shutdown()
+        analyzer = null
+        analysis = null
+        provider = null
+    }
+
+    fun stopRaw() {
+        rawSource?.stop()
+        rawSource = null
+    }
+
+    @androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
     private fun backCameraAperture(camera: androidx.camera.core.Camera): Float =
         runCatching {
             val info = Camera2CameraInfo.from(camera.cameraInfo)

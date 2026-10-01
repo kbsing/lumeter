@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -44,6 +46,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.lumeter.core.exposure.ExposureMode
 import com.lumeter.core.exposure.ReadingInvalidReason
 import com.lumeter.core.meter.MeteringMode
+import com.lumeter.core.meter.ZoneMath
 import com.lumeter.data.ActiveField
 import com.lumeter.ui.AppViewModel
 import com.lumeter.ui.common.FormatUtils
@@ -87,14 +90,19 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
         val boxWidth = constraints.maxWidth.toFloat()
         val boxHeight = constraints.maxHeight.toFloat()
 
-        LaunchedEffect(previewView, lifecycleOwner) {
-            vm.startCamera(lifecycleOwner, previewView)
-        }
+        if (vm.rawMode) {
+            // RAW mode renders through a plain TextureView owned by the Camera2 session.
+            RawCameraView(vm, Modifier.fillMaxSize())
+        } else {
+            LaunchedEffect(previewView, lifecycleOwner) {
+                vm.startCamera(lifecycleOwner, previewView)
+            }
 
-        androidx.compose.ui.viewinterop.AndroidView(
-            factory = { previewView },
-            modifier = Modifier.fillMaxSize(),
-        )
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { previewView },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
 
         // Tap layer: MULTI adds a spot, SPOT moves the single metering point.
         Box(
@@ -115,16 +123,6 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
 
         ModeReticle(vm)
 
-        if (vm.meteringMode == MeteringMode.MULTI) {
-            SpotLayer(vm, boxWidth, boxHeight)
-            MultiSpotInfo(
-                vm,
-                Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 10.dp, top = 8.dp),
-            )
-        }
-
         Text(
             "${vm.luxText} ${stringResource(R.string.lux)}",
             style = LabelTiny,
@@ -134,8 +132,32 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                 .padding(end = 12.dp, top = 10.dp),
         )
 
+        if (vm.rawActive) {
+            RawBadge(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 12.dp, top = 28.dp),
+            )
+        }
+
         val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
             android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        if (vm.meteringMode == MeteringMode.MULTI) {
+            MultiSpotInfo(
+                vm,
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 10.dp, top = 8.dp),
+            )
+        } else if (landscape) {
+            LiveChip(
+                vm,
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 10.dp, top = 8.dp),
+            )
+        }
+
         if (landscape) {
             TopParamsStrip(
                 vm,
@@ -145,20 +167,18 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                         top = if (vm.meteringMode == MeteringMode.MULTI) 58.dp else 8.dp,
                     ),
             )
-            if (vm.meteringMode != MeteringMode.MULTI) {
-                LiveChip(
-                    vm,
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 10.dp, top = 8.dp),
-                )
-            }
         }
 
+        // Reading panel first, spot handles after: spots stay visible and touchable
+        // where they overlap the readout (the panel itself takes no input).
         ReadoutPanel(
             vm,
             Modifier.align(Alignment.BottomCenter),
         )
+
+        if (vm.meteringMode == MeteringMode.MULTI) {
+            SpotLayer(vm, boxWidth, boxHeight)
+        }
 
         if (vm.flashKey > 0) {
             val alpha by animateFloatAsState(
@@ -173,6 +193,21 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+/** "RAW" chip marking the Bayer-domain metering source. */
+@Composable
+private fun RawBadge(modifier: Modifier = Modifier) {
+    Text(
+        "RAW",
+        fontSize = 10.sp,
+        letterSpacing = 1.sp,
+        color = ColorAccent,
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(ColorBody.copy(alpha = 0.7f))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }
 
 /** Line color that stays legible on the given linear luma (auto-inverted). */
@@ -250,6 +285,7 @@ private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
     Box(Modifier.fillMaxSize()) {
         val engineEvs = vm.spotDisplayEvs
         val base = vm.sceneEv
+        val zones = vm.spotZones
         vm.spots.forEachIndexed { index, spot ->
             val spotKeyline = contrastOn(
                 run {
@@ -268,13 +304,20 @@ private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
                     y = spot.y * boxHeight,
                     boxWidth = boxWidth,
                     boxHeight = boxHeight,
-                    label = "${index + 1} \u00b7 ${FormatUtils.evText(ev)}",
+                    label = spotLabel(index, ev, zones.getOrNull(index), vm.zoneEnabled),
                     keyline = spotKeyline,
                     onDrag = { nx, ny -> vm.updateSpot(spot.id, nx / boxWidth, ny / boxHeight) },
                     onDelete = { vm.removeSpot(spot.id) },
                 )
         }
     }
+}
+
+/** Spot chip text: "1 · 12.4", gaining " · VII" once Zone placement is armed. */
+private fun spotLabel(index: Int, ev: Double, zone: Double?, zoneEnabled: Boolean): String {
+    val text = "${index + 1} \u00b7 ${FormatUtils.evText(ev)}"
+    if (!zoneEnabled || zone == null || !zone.isFinite()) return text
+    return "$text \u00b7 ${ZoneMath.LABELS[ZoneMath.zoneIndex(zone)]}"
 }
 
 /**
@@ -433,6 +476,12 @@ private fun ReadoutPanel(
                 Text(rightValue, style = DisplayMedium.copy(fontSize = 34.sp, lineHeight = 34.sp), color = rightColor)
             }
         }
+        ZoneStrip(
+            vm,
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 3.dp),
+        )
         ExposureScaleCanvas(
             needle = vm.needle,
             matched = vm.matched,
@@ -460,6 +509,74 @@ private fun ReadoutPanel(
             )
         }
     }
+}
+
+/**
+ * Zone System strip above the ±3 scale: a ZONE arming chip, and when armed, the 0–X
+ * placement cells (tap to place the metered area) plus the placed zone's description.
+ */
+@Composable
+private fun ZoneStrip(vm: AppViewModel, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.zone).uppercase(),
+            fontSize = 9.sp,
+            letterSpacing = 1.sp,
+            color = if (vm.zoneEnabled) ColorBody else ColorDim,
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(if (vm.zoneEnabled) ColorAccent else ColorBody.copy(alpha = 0.6f))
+                .clickable { vm.toggleZone() }
+                .padding(horizontal = 7.dp, vertical = 4.dp),
+        )
+        if (vm.zoneEnabled) {
+            ZoneMath.LABELS.forEachIndexed { zone, label ->
+                val selected = vm.placedZone == zone
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (selected) ColorAccent else ColorBody.copy(alpha = 0.6f))
+                        .clickable { vm.setPlacedZone(zone) }
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (selected) ColorBody else ColorInk,
+                    )
+                }
+            }
+            Text(
+                zoneDescription(vm.placedZone),
+                fontSize = 9.sp,
+                color = ColorDim,
+                maxLines = 1,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun zoneDescription(zone: Int): String = when (zone) {
+    0 -> stringResource(R.string.zone_d0)
+    1 -> stringResource(R.string.zone_d1)
+    2 -> stringResource(R.string.zone_d2)
+    3 -> stringResource(R.string.zone_d3)
+    4 -> stringResource(R.string.zone_d4)
+    5 -> stringResource(R.string.zone_d5)
+    6 -> stringResource(R.string.zone_d6)
+    7 -> stringResource(R.string.zone_d7)
+    8 -> stringResource(R.string.zone_d8)
+    9 -> stringResource(R.string.zone_d9)
+    else -> stringResource(R.string.zone_d10)
 }
 
 /** The ±3 EV needle scale at the bottom of the viewfinder. */

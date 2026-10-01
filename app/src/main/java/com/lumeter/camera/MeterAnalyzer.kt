@@ -5,21 +5,19 @@ import android.hardware.camera2.CaptureResult
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.lumeter.core.meter.EvMath
+import com.lumeter.core.meter.FusedReading
 import com.lumeter.core.meter.FrameExposure
-import com.lumeter.core.meter.MeteringFusion
 import com.lumeter.core.meter.MeteringFrameStat
 import com.lumeter.core.meter.MeteringMode
 import com.lumeter.core.meter.MeteringSource
-import com.lumeter.core.meter.MeterReading
 import com.lumeter.core.meter.PlaneSampler
 import com.lumeter.core.meter.RegionStat
 import com.lumeter.core.meter.YuvColorEncoding
 import com.lumeter.core.meter.YuvFrameAnalyzer
-import kotlin.math.abs
 
 /** State the meter engine publishes to the UI. Spot EVs are raw (uncalibrated). */
 data class MeterEngineState(
-    val reading: MeterReading?,
+    val reading: FusedReading?,
     /** Per-spot EV100 for MULTI mode, ordered to match the spot list set via [MeterAnalyzer.spots]. */
     val spotEvs: List<Double> = emptyList(),
     val aeConverged: Boolean = false,
@@ -30,6 +28,10 @@ data class MeterEngineState(
     val analysisWidth: Int = 0,
     val analysisHeight: Int = 0,
     val rotationDegrees: Int = 0,
+    /** RAW mode: the PREVIEW buffer dims (differs from the RAW stream; drives the
+     *  TextureView fill-center matrix). YUV path leaves these at 0. */
+    val previewWidth: Int = 0,
+    val previewHeight: Int = 0,
 )
 
 /** A MULTI-mode metering spot in normalized analysis-frame coordinates. */
@@ -40,9 +42,8 @@ data class MeterSpot(val frameU: Float, val frameV: Float)
  *
  * Per-frame robust luma over the mode's ROI(s), linearized through the reported tonemap,
  * converted to EV100 with the frame's own exposure metadata (Camera2Interop session
- * callback + SENSOR_TIMESTAMP pairing via [CaptureResultStore]). A reading is accepted
- * only while the camera's exposure has been stable for [STABLE_FRAME_WINDOW] frames
- * within a small tolerance; stable frames feed a ring whose median is published.
+ * callback + SENSOR_TIMESTAMP pairing via [CaptureResultStore]). Stability gating and
+ * median fusion live in [ReadingAccumulator], shared with the RAW source.
  *
  * HOLD (AE-L) and PAUSE freeze the published state at the last live reading; the analyzer
  * keeps draining the result store so pairing does not back up behind stale entries.
@@ -60,9 +61,7 @@ class MeterAnalyzer(
     /** When paused, take exactly one more stable reading, then freeze again. */
     @Volatile var oneShot = false
 
-    private val statRing = ArrayDeque<MeteringFrameStat>()
-    private val exposureHistory = ArrayDeque<FrameExposure>()
-    private var lastPublishedReading: MeterReading? = null
+    private val accumulator = ReadingAccumulator(MeteringSource.YUV_PREVIEW)
     private var lastSpotEvs: List<Double> = emptyList()
     private var lastConverged = false
     private var lastWidth = 0
@@ -130,7 +129,8 @@ class MeterAnalyzer(
                 emptyList()
             }
 
-            val converged = exposureStable(exposure) || aeStateConverged(captureResult)
+            val converged = accumulator.exposureStable(exposure) ||
+                aeStateConverged(captureResult)
             val stat = region?.let { reg ->
                 EvMath.ev100(exposure, reg.luma)?.let { ev ->
                     MeteringFrameStat(
@@ -143,39 +143,23 @@ class MeterAnalyzer(
                     )
                 }
             }
-            if (converged && stat != null) {
-                statRing.addLast(stat)
-                while (statRing.size > STAT_RING_SIZE) statRing.removeFirst()
-            } else if (!converged) {
-                statRing.clear()
-            }
 
             frameCounter++
             if (frameCounter % LOG_INTERVAL_FRAMES == 0) {
-                val last = statRing.lastOrNull()
                 android.util.Log.i(
                     TAG,
-                    "ev100=${last?.ev100} luma=${last?.luma} converged=$converged " +
-                        "mode=$mode ring=${statRing.size} iso=${exposure.sensitivity} " +
+                    "ev100=${stat?.ev100} luma=${stat?.luma} converged=$converged " +
+                        "mode=$mode iso=${exposure.sensitivity} " +
                         "t_ns=${exposure.exposureTimeNs} aperture=${exposure.aperture} " +
                         "tonemap=${captureResult.get(CaptureResult.TONEMAP_MODE)} " +
                         "pairMissed=${resultStore.missedCount}",
                 )
             }
 
-            if (oneShot && converged && statRing.size >= STAT_RING_SIZE) {
+            if (oneShot && converged && stat != null) {
                 oneShot = false
             }
-            val fused = if (statRing.isNotEmpty()) {
-                MeteringFusion.fuse(statRing.toList(), MeteringSource.YUV_PREVIEW)
-            } else {
-                null
-            }
-            val publishReading = fused?.takeIf { new ->
-                val last = lastPublishedReading
-                last == null || abs(new.sceneEv100 - last.sceneEv100) >= PUBLISH_DELTA_EV
-            }
-            if (publishReading != null) lastPublishedReading = publishReading
+            val snapshot = accumulator.offer(exposure, converged, stat)
             if (mode == MeteringMode.MULTI) lastSpotEvs = spotEvs
             lastConverged = converged
             lastWidth = image.width
@@ -184,7 +168,7 @@ class MeterAnalyzer(
 
             onState(
                 MeterEngineState(
-                    reading = publishReading ?: lastPublishedReading,
+                    reading = snapshot.display,
                     spotEvs = if (mode == MeteringMode.MULTI) lastSpotEvs else emptyList(),
                     aeConverged = converged,
                     cameraIso = exposure.sensitivity,
@@ -202,16 +186,14 @@ class MeterAnalyzer(
     }
 
     fun reset() {
-        statRing.clear()
-        exposureHistory.clear()
-        lastPublishedReading = null
+        accumulator.reset()
         lastSpotEvs = emptyList()
     }
 
     private fun publishFrozen() {
         onState(
             MeterEngineState(
-                reading = lastPublishedReading,
+                reading = accumulator.frozen(lastConverged).display,
                 spotEvs = lastSpotEvs,
                 aeConverged = lastConverged,
                 analysisWidth = lastWidth,
@@ -229,31 +211,11 @@ class MeterAnalyzer(
         return FrameExposure(time, sensitivity, aperture)
     }
 
-    /**
-     * HAL-reported exposure jitters by tiny amounts frame to frame (±1 ISO step, a few
-     * hundred ns), so exact equality never holds on real devices. Treat the exposure as
-     * stable while every frame in the window sits within [STABLE_TOLERANCE_EV] of the first.
-     */
-    private fun exposureStable(exposure: FrameExposure): Boolean {
-        exposureHistory.addLast(exposure)
-        while (exposureHistory.size > STABLE_FRAME_WINDOW) exposureHistory.removeFirst()
-        if (exposureHistory.size < STABLE_FRAME_WINDOW) return false
-        val first = exposureHistory.first()
-        return exposureHistory.all { frame ->
-            abs(EvMath.log2(frame.exposureTimeNs.toDouble() / first.exposureTimeNs)) < STABLE_TOLERANCE_EV &&
-                abs(EvMath.log2(frame.sensitivity.toDouble() / first.sensitivity.toDouble())) < STABLE_TOLERANCE_EV
-        }
-    }
-
     private fun aeStateConverged(result: CaptureResult): Boolean =
         result.get(CaptureResult.CONTROL_AE_STATE) == CameraMetadata.CONTROL_AE_STATE_CONVERGED
 
     private companion object {
         private const val TAG = "LumeterMeter"
-        private const val STABLE_FRAME_WINDOW = 4
-        private const val STABLE_TOLERANCE_EV = 1.0 / 24.0 // ignore ±1/24 EV HAL jitter
-        private const val STAT_RING_SIZE = 5
-        private const val PUBLISH_DELTA_EV = 1.0 / 12.0
         private const val LOG_INTERVAL_FRAMES = 30
     }
 }

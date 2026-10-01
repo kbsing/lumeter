@@ -95,7 +95,7 @@
     <string name="accent_colour">アクセントカラー</string>
     <string name="calibration_menu">キャリブレーション</string>
     <string name="calibration_desc">センサーオフセットと反射光定数。</string>
-    <string name="version">LUMEN MK·I — v0.3.0</string>
+    <string name="version">LUMEN MK·I — v0.6.0</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">アンバー</string>
@@ -123,4 +123,44 @@
     <string name="scale_limit">段差の制限</string>
     <string name="delete_confirm">この測光記録を削除しますか？</string>
     <string name="cancel">キャンセル</string>
+
+    <!-- Zone System -->
+    <string name="zone">ZONE</string>
+    <string name="zone_d0">純黒、ディテールなし</string>
+    <string name="zone_d1">黒に近い、かすかなディテール</string>
+    <string name="zone_d2">テクスチャのある暗部</string>
+    <string name="zone_d3">典型的なシャドウ</string>
+    <string name="zone_d4">濃い葉・岩</string>
+    <string name="zone_d5">ミドルグレー(18%)</string>
+    <string name="zone_d6">明るい肌の色</string>
+    <string name="zone_d7">明るいグレー</string>
+    <string name="zone_d8">白に近い、質感あり</string>
+    <string name="zone_d9">紙白、質感なし</string>
+    <string name="zone_d10">純白</string>
+
+    <!-- Tools -->
+    <string name="tools">ツール</string>
+    <string name="tool_film">フィルム</string>
+    <string name="tool_reciprocity">相反則不軌</string>
+    <string name="tool_corrected">補正後</string>
+    <string name="tool_correction">補正</string>
+    <string name="tool_flash">フラッシュ</string>
+    <string name="tool_dof">被写界深度</string>
+    <string name="tool_near">前側</string>
+    <string name="tool_far">後側</string>
+    <string name="tool_hyperfocal">過焦点距離</string>
+    <string name="tool_latitude">フィルムのラチチュード</string>
+    <string name="tool_highlight_headroom">ハイライト</string>
+    <string name="tool_shadow_headroom">シャドウ</string>
+    <string name="tool_scene_range">レンジ</string>
+    <string name="tool_need_spots">シーンレンジの測定には MULTI モードでスポットを2点以上追加してください。</string>
+    <string name="tool_clips">この配置ではハイライトが白飛びします。</string>
+    <string name="tool_blocks">この配置ではシャドウがつぶれます。</string>
+    <string name="tool_fits">シーンはこのフィルムのラチチュードに収まります。</string>
+    <string name="tool_range_exceeds">シーンレンジがラチチュードを超えています。</string>
+
+    <!-- RAW metering -->
+    <string name="raw_metering">RAW 測光</string>
+    <string name="raw_metering_desc">ISP のトーンカーブを介さず、Bayer センサーデータから直接測光。非対応デバイスでは YUV にフォールバックします。</string>
+    <string name="raw_unavailable">RAW 利用不可(%1$s)— YUV にフォールバックしました。</string>
 </resources>
