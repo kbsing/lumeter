@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -92,18 +93,18 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxSize(),
         )
 
-        // Multi-spot tap layer (also the base hit target under the reticle).
+        // Tap layer: MULTI adds a spot, SPOT moves the single metering point.
         Box(
             Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     detectTapGestures { offset ->
-                        if (vm.meteringMode == MeteringMode.MULTI) {
-                            vm.addSpot(
-                                x = (offset.x / size.width).coerceIn(0f, 1f),
-                                y = (offset.y / size.height).coerceIn(0f, 1f),
-                                ev100 = vm.ev100 ?: 0.0,
-                            )
+                        val x = (offset.x / size.width).coerceIn(0.02f, 0.98f)
+                        val y = (offset.y / size.height).coerceIn(0.02f, 0.98f)
+                        when (vm.meteringMode) {
+                            MeteringMode.MULTI -> vm.addSpot(x, y, vm.ev100 ?: 0.0)
+                            MeteringMode.SPOT -> vm.setSpotPos(x, y)
+                            else -> {}
                         }
                     }
                 },
@@ -112,8 +113,8 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
         CornerMarks()
         ModeReticle(vm.meteringMode)
 
-        if (vm.meteringMode == MeteringMode.MULTI) {
-            MultiSpotLayer(vm, boxWidth, boxHeight)
+        if (vm.meteringMode == MeteringMode.MULTI || vm.meteringMode == MeteringMode.SPOT) {
+            SpotLayer(vm, boxWidth, boxHeight)
             MultiSpotInfo(
                 vm,
                 Modifier
@@ -184,7 +185,7 @@ private fun CornerMarks() {
 
 @Composable
 private fun ModeReticle(mode: MeteringMode) {
-    if (mode == MeteringMode.MULTI) return
+    if (mode == MeteringMode.MULTI || mode == MeteringMode.SPOT) return
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val shape = when (mode) {
             MeteringMode.SPOT -> Modifier
@@ -210,10 +211,13 @@ private fun ModeReticle(mode: MeteringMode) {
 }
 
 @Composable
-private fun MultiSpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
-    // Push spot positions to the engine whenever geometry or spots change.
+private fun SpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
+    val isMulti = vm.meteringMode == MeteringMode.MULTI
+    // Push spot positions to the engine whenever geometry or any spot moves.
     LaunchedEffect(
-        vm.spots.size,
+        vm.spots,
+        vm.spotPos,
+        vm.meteringMode,
         vm.analysisWidth,
         vm.analysisHeight,
         vm.rotationDegrees,
@@ -229,69 +233,120 @@ private fun MultiSpotLayer(vm: AppViewModel, boxWidth: Float, boxHeight: Float) 
                 viewWidth = boxWidth.toInt(),
                 viewHeight = boxHeight.toInt(),
             )
+            val viewPoints = if (isMulti) {
+                vm.spots.map { it.x to it.y }
+            } else {
+                listOf(vm.spotPos)
+            }
             vm.pushEngineSpots(
-                vm.spots.map { transform.screenToFrame(it.x * boxWidth, it.y * boxHeight) },
+                viewPoints.map { (x, y) -> transform.screenToFrame(x * boxWidth, y * boxHeight) },
             )
         }
     }
 
     Box(Modifier.fillMaxSize()) {
-        vm.spots.forEachIndexed { index, spot ->
-            val engineEvs = vm.spotDisplayEvs
-            val ev = engineEvs.getOrNull(index)?.takeIf { it.isFinite() } ?: spot.ev100
-            val x = spot.x * boxWidth
-            val y = spot.y * boxHeight
-            Box(
-                Modifier
-                    .offset {
-                        // Center the 88dp container on the tap point; convert its half
-                        // size to px inside the Density-receiver lambda.
-                        val half = 44.dp.roundToPx()
-                        androidx.compose.ui.unit.IntOffset(
-                            (x - half).roundToInt(),
-                            (y - half).roundToInt(),
-                        )
-                    }
-                    .size(88.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                // Wide invisible hit area wrapping the visible ring.
-                Box(
-                    Modifier
-                        .size(88.dp)
-                        .clip(CircleShape)
-                        .clickable { vm.removeSpot(spot.id) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .border(2.dp, ColorAccent, CircleShape)
-                            .background(ColorBody.copy(alpha = 0.3f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Box(
-                            Modifier
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(ColorAccent),
+        val engineEvs = vm.spotDisplayEvs
+        if (isMulti) {
+            vm.spots.forEachIndexed { index, spot ->
+                val ev = engineEvs.getOrNull(index)?.takeIf { it.isFinite() } ?: spot.ev100
+                SpotHandle(
+                    x = spot.x * boxWidth,
+                    y = spot.y * boxHeight,
+                    boxWidth = boxWidth,
+                    boxHeight = boxHeight,
+                    label = "${index + 1} \u00b7 ${FormatUtils.evText(ev)}",
+                    onDrag = { nx, ny -> vm.updateSpot(spot.id, nx / boxWidth, ny / boxHeight) },
+                    onTap = { vm.removeSpot(spot.id) },
+                )
+            }
+        } else {
+            val ev = engineEvs.firstOrNull()?.takeIf { it.isFinite() } ?: vm.ev100 ?: 0.0
+            SpotHandle(
+                x = vm.spotPos.first * boxWidth,
+                y = vm.spotPos.second * boxHeight,
+                boxWidth = boxWidth,
+                boxHeight = boxHeight,
+                label = FormatUtils.evText(ev),
+                onDrag = { nx, ny -> vm.setSpotPos(nx / boxWidth, ny / boxHeight) },
+                onTap = null,
+            )
+        }
+    }
+}
+
+/**
+ * A small draggable metering spot: 24dp ring, wide invisible hit area, and an EV chip
+ * that flips to the left when the spot is near the right screen edge.
+ */
+@Composable
+private fun SpotHandle(
+    x: Float,
+    y: Float,
+    boxWidth: Float,
+    boxHeight: Float,
+    label: String,
+    onDrag: (Float, Float) -> Unit,
+    onTap: (() -> Unit)?,
+) {
+    Box(
+        Modifier
+            .offset {
+                val half = 24.dp.roundToPx() // half of the 48dp hit container
+                androidx.compose.ui.unit.IntOffset(
+                    (x - half).roundToInt(),
+                    (y - half).roundToInt(),
+                )
+            }
+            .size(48.dp),
+    ) {
+        Box(
+            Modifier
+                .size(48.dp)
+                .pointerInput(Unit) {
+                    detectDragGestures { change, amount ->
+                        change.consume()
+                        onDrag(
+                            (x + amount.x).coerceIn(8f, boxWidth - 8f),
+                            (y + amount.y).coerceIn(8f, boxHeight - 8f),
                         )
                     }
                 }
-                Text(
-                    "${index + 1} · ${FormatUtils.evText(ev)}",
-                    fontSize = 10.sp,
-                    color = ColorInk,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .offset(x = 46.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(ColorBody.copy(alpha = 0.8f))
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                .pointerInput(Unit) {
+                    detectTapGestures { onTap?.invoke() }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, ColorAccent, CircleShape)
+                    .background(ColorBody.copy(alpha = 0.25f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .size(3.dp)
+                        .clip(CircleShape)
+                        .background(ColorAccent),
                 )
             }
         }
+        // EV chip; flip to the left side when the spot hugs the right edge.
+        val flipLeft = with(androidx.compose.ui.platform.LocalDensity.current) {
+            x > boxWidth - 140.dp.toPx()
+        }
+        Text(
+            label,
+            fontSize = 10.sp,
+            color = ColorInk,
+            modifier = Modifier
+                .align(if (flipLeft) Alignment.CenterStart else Alignment.CenterEnd)
+                .offset(x = if (flipLeft) (-46).dp else 30.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(ColorBody.copy(alpha = 0.8f))
+                .padding(horizontal = 5.dp, vertical = 2.dp),
+        )
     }
 }
 

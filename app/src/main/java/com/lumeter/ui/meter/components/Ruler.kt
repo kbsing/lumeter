@@ -49,14 +49,16 @@ fun ValueRuler(
         val pagerState = rememberPagerState(
             initialPage = currentIndex.coerceIn(0, entries.lastIndex),
         ) { entries.size }
-        val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+        // CLOCK_TICK is the proper detent feedback for dials; Compose's HapticFeedbackType
+        // has no equivalent this device responds to, so go through the host view.
+        val view = androidx.compose.ui.platform.LocalView.current
         androidx.compose.runtime.LaunchedEffect(pagerState, hapticEnabled) {
             androidx.compose.runtime.snapshotFlow { pagerState.currentPage }
                 .drop(1)
                 .collect {
                     if (hapticEnabled) {
-                        haptics.performHapticFeedback(
-                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                        view.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.CLOCK_TICK,
                         )
                     }
                 }
