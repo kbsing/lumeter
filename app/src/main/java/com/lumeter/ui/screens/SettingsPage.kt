@@ -120,6 +120,22 @@ fun SettingsPage(
                 checked = appViewModel.rawMode,
                 onCheckedChange = { tick(); appViewModel.toggleRawMode() }
             )
+
+            // Histogram overlay + automatic scene range
+            SettingToggle(
+                title = stringResource(R.string.histogram),
+                description = stringResource(R.string.histogram_desc),
+                checked = appViewModel.histogramEnabled,
+                onCheckedChange = { tick(); appViewModel.toggleHistogram() }
+            )
+
+            // Draggable SPOT
+            SettingToggle(
+                title = stringResource(R.string.spot_follow),
+                description = stringResource(R.string.spot_follow_desc),
+                checked = appViewModel.spotDraggable,
+                onCheckedChange = { tick(); appViewModel.setSpotDraggable(it) }
+            )
             
             Spacer(Modifier.height(8.dp))
             

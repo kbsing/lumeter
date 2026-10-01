@@ -39,6 +39,8 @@ data class ExposureState(
     val ndStops: Int = 0,
     val teleStops: Double = 0.0,
     val magnification: Double = 0.0,
+    /** Film reciprocity model of the loaded stock; null = no compensation. */
+    val reciprocity: com.lumeter.core.tools.Reciprocity? = null,
 )
 
 enum class ResultKind { OK, NO_READING, NO_SOLUTION }
@@ -51,6 +53,8 @@ data class Causes(
     val accessory: Double,
     /** Residual left purely by snapping to the discrete scale, in stops. */
     val quantizedResidual: Double,
+    /** Reciprocity compensation folded into the solve, in stops (≥0). */
+    val reciprocity: Double = 0.0,
 )
 
 enum class SuggestionKind { ISO, APERTURE, SHUTTER, ND, ACCEPT }

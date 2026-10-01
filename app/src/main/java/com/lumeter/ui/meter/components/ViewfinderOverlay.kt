@@ -108,20 +108,59 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
+                .pointerInput(vm.meteringMode, vm.spotDraggable) {
                     detectTapGestures { offset ->
-                        if (vm.meteringMode == MeteringMode.MULTI) {
-                            vm.addSpot(
+                        when (vm.meteringMode) {
+                            MeteringMode.MULTI -> vm.addSpot(
                                 (offset.x / size.width).coerceIn(0.02f, 0.98f),
                                 (offset.y / size.height).coerceIn(0.02f, 0.98f),
                                 vm.ev100 ?: 0.0,
                             )
+                            MeteringMode.SPOT ->
+                                if (vm.spotDraggable) {
+                                    vm.setSpotPosition(
+                                        offset.x / size.width,
+                                        offset.y / size.height,
+                                    )
+                                }
+                            else -> Unit
                         }
                     }
                 },
         )
 
-        ModeReticle(vm)
+        ModeReticle(vm, boxWidth, boxHeight)
+
+        if (vm.meteringMode == MeteringMode.SPOT) {
+            // Keep the engine's spot ROI under the viewfinder reticle (or center).
+            LaunchedEffect(
+                vm.spotPosition,
+                vm.spotDraggable,
+                vm.analysisWidth,
+                vm.analysisHeight,
+                vm.rotationDegrees,
+                boxWidth,
+                boxHeight,
+            ) {
+                if (vm.analysisWidth > 0 && vm.analysisHeight > 0) {
+                    val src = if (vm.spotDraggable) {
+                        vm.spotPosition
+                    } else {
+                        0.5f to 0.5f
+                    }
+                    val transform = PreviewGeometry.FillCenterTransform(
+                        rotationDegrees = vm.rotationDegrees,
+                        mirrored = false,
+                        frameWidth = vm.analysisWidth,
+                        frameHeight = vm.analysisHeight,
+                        viewWidth = boxWidth.toInt(),
+                        viewHeight = boxHeight.toInt(),
+                    )
+                    val (fu, fv) = transform.screenToFrame(src.first * boxWidth, src.second * boxHeight)
+                    vm.pushEngineSpotPosition(fu, fv)
+                }
+            }
+        }
 
         Text(
             "${vm.luxText} ${stringResource(R.string.lux)}",
@@ -166,6 +205,17 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                     .padding(
                         top = if (vm.meteringMode == MeteringMode.MULTI) 58.dp else 8.dp,
                     ),
+            )
+        }
+
+        if (vm.histogramEnabled) {
+            val stripPad = if (vm.meteringMode == MeteringMode.MULTI) 58.dp else 8.dp
+            HistogramOverlay(
+                vm,
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = if (landscape) stripPad + 34.dp else 8.dp)
+                    .fillMaxWidth(0.62f),
             )
         }
 
@@ -215,7 +265,7 @@ private fun contrastOn(luma: Double): Color =
     if (luma > 0.30) Color(0xD910100E) else Color(0xB3ECE8DF)
 
 @Composable
-private fun ModeReticle(vm: AppViewModel) {
+private fun ModeReticle(vm: AppViewModel, boxWidth: Float, boxHeight: Float) {
     val mode = vm.meteringMode
     if (mode == MeteringMode.MULTI) return
     // SPOT's reading IS the center, so refine the local brightness estimate with it.
@@ -231,6 +281,17 @@ private fun ModeReticle(vm: AppViewModel) {
         vm.engineRawLuma
     }
     val line = contrastOn(local)
+    if (mode == MeteringMode.SPOT && vm.spotDraggable) {
+        DraggableSpotReticle(
+            x = vm.spotPosition.first * boxWidth,
+            y = vm.spotPosition.second * boxHeight,
+            line = line,
+            vm = vm,
+            boxWidth = boxWidth,
+            boxHeight = boxHeight,
+        )
+        return
+    }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val shape = when (mode) {
             MeteringMode.SPOT -> Modifier
@@ -250,6 +311,78 @@ private fun ModeReticle(vm: AppViewModel) {
                     .size(6.dp)
                     .clip(CircleShape)
                     .background(line),
+            )
+        }
+    }
+}
+
+/** SPOT reticle at the movable point: 48dp hit area, drag retargets the metering ROI. */
+@Composable
+private fun DraggableSpotReticle(
+    x: Float,
+    y: Float,
+    line: Color,
+    vm: AppViewModel,
+    boxWidth: Float,
+    boxHeight: Float,
+) {
+    val currentX by androidx.compose.runtime.rememberUpdatedState(x)
+    val currentY by androidx.compose.runtime.rememberUpdatedState(y)
+    Box(
+        Modifier
+            .offset {
+                val half = 24.dp.roundToPx()
+                androidx.compose.ui.unit.IntOffset(
+                    (x - half).roundToInt(),
+                    (y - half).roundToInt(),
+                )
+            }
+            .size(48.dp)
+            .pointerInput(Unit) {
+                detectDragGestures { change, amount ->
+                    change.consume()
+                    vm.setSpotPosition(
+                        (currentX + amount.x) / boxWidth,
+                        (currentY + amount.y) / boxHeight,
+                    )
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(32.dp)
+                .border(1.5.dp, line, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(line),
+            )
+        }
+    }
+}
+
+/** EV-domain frame histogram, drawn as translucent bars on a log axis. */
+@Composable
+private fun HistogramOverlay(vm: AppViewModel, modifier: Modifier = Modifier) {
+    val histogram = vm.engineHistogram ?: return
+    if (histogram.size < 2) return
+    // Resolve the themed accent before the draw scope (not composable in there).
+    val accent = ColorAccent
+    Canvas(modifier.height(30.dp)) {
+        val max = histogram.max()
+        if (max <= 0) return@Canvas
+        val bar = size.width / histogram.size
+        for (i in histogram.indices) {
+            val h = (histogram[i].toFloat() / max) * (size.height - 2f)
+            if (h <= 0f) continue
+            drawRect(
+                color = accent.copy(alpha = 0.5f),
+                topLeft = Offset(i * bar, size.height - h),
+                size = androidx.compose.ui.geometry.Size(bar * 0.72f, h),
             )
         }
     }
@@ -496,6 +629,13 @@ private fun ReadoutPanel(
                 append(
                     stringResource(R.string.scale_limit) +
                         " " + FormatUtils.signed(causes.quantizedResidual),
+                )
+            }
+            if (causes != null && causes.reciprocity > 0.01) {
+                if (isNotBlank()) append("  \u00b7  ")
+                append(
+                    stringResource(R.string.reciprocity_short) + " " +
+                        FormatUtils.signed(causes.reciprocity),
                 )
             }
             result.suggestions.firstOrNull()?.let { append("  \u00b7  " + it.detail) }

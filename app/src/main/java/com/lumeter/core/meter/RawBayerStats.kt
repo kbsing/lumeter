@@ -168,5 +168,74 @@ object RawBayerStats {
         CfaPattern.BGGR -> when (position) { 0 -> 3; 1 -> 1; 2 -> 2; else -> 0 }
     }
 
+    /**
+     * Whole-frame EV-domain analysis over sampled 2x2 cells: each cell contributes one
+     * cell-averaged Rec.709 luminance, so histogram and percentiles share the sampling
+     * budget with [regionStat]. Cell stride follows the same max-samples rule.
+     */
+    fun frameAnalysis(
+        reader: PixelReader,
+        cfa: CfaPattern,
+        blackLevels: FloatArray,
+        whiteLevel: Int,
+        frameWidth: Int,
+        frameHeight: Int,
+        maxCells: Int = MAX_CELLS,
+    ): LumaFrameStats? {
+        if (whiteLevel <= 0 || blackLevels.size < 4 || frameWidth < 2 || frameHeight < 2) return null
+        for (level in blackLevels) {
+            if (!level.isFinite() || level < 0f || level >= whiteLevel) return null
+        }
+        val cellColumns = frameWidth / 2
+        val cellRows = frameHeight / 2
+        val totalCells = cellColumns.toLong() * cellRows
+        val stride = if (totalCells <= maxCells) {
+            1
+        } else {
+            kotlin.math.ceil(kotlin.math.sqrt(totalCells.toDouble() / maxCells)).toInt()
+                .coerceAtLeast(1)
+        }
+
+        val luminances = DoubleArray(maxCells)
+        var count = 0
+        var clipped = 0
+        val pixelStep = stride * 2
+        var y = 0
+        while (y + 1 < frameHeight) {
+            var x = 0
+            while (x + 1 < frameWidth) {
+                var r = 0.0
+                var g = 0.0
+                var b = 0.0
+                for (dy in 0..1) {
+                    for (dx in 0..1) {
+                        val px = x + dx
+                        val py = y + dy
+                        val raw = reader.sample(px, py) ?: continue
+                        val position = ((py and 1) shl 1) or (px and 1)
+                        val black = blackLevels[position].toDouble()
+                        val denominator = maxOf(1.0, whiteLevel.toDouble() - black)
+                        val normalized = ((raw - black) / denominator).coerceIn(0.0, 1.0)
+                        when (channelFor(cfa, position)) {
+                            0 -> r = normalized
+                            1, 2 -> g += normalized * 0.5
+                            else -> b = normalized
+                        }
+                        if (normalized >= 0.985) clipped++
+                    }
+                }
+                if (count < luminances.size) {
+                    luminances[count] = 0.2126 * r + 0.7152 * g + 0.0722 * b
+                    count++
+                }
+                x += pixelStep
+            }
+            y += pixelStep
+        }
+        if (count == 0) return null
+        luminances.sort(0, count)
+        return LumaHistogram.analyze(luminances, count, clipped)
+    }
+
     private const val MAX_CELLS = 16_384
 }

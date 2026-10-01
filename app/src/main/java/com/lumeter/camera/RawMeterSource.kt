@@ -23,6 +23,7 @@ import android.util.Log
 import android.util.Size
 import com.lumeter.core.meter.CfaPattern
 import com.lumeter.core.meter.EvMath
+import com.lumeter.core.meter.LumaFrameStats
 import com.lumeter.core.meter.FrameExposure
 import com.lumeter.core.meter.MeteringMode
 import com.lumeter.core.meter.MeteringSource
@@ -58,6 +59,10 @@ class RawMeterSource(
     @Volatile var live: Boolean = true
     /** When paused, take exactly one more stable reading, then freeze again. */
     @Volatile var oneShot = false
+    /** SPOT mode's metering point in frame coordinates (default: center). */
+    @Volatile var spotPosition: MeterSpot = MeterSpot(0.5f, 0.5f)
+    /** Histogram overlay + automatic scene range sampling. */
+    @Volatile var frameAnalysisEnabled: Boolean = false
 
     @Volatile var active: Boolean = false
         private set
@@ -82,6 +87,9 @@ class RawMeterSource(
     private var defaultAperture = 2.0f
     private var openRetries = 0
     private var frameCounter = 0
+    private var lastHistogram: IntArray? = null
+    private var lowEvEma: Double? = null
+    private var highEvEma: Double? = null
 
     private val cameraManager: CameraManager =
         context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -315,6 +323,17 @@ class RawMeterSource(
             emptyList()
         }
         frameCounter++
+        if (frameAnalysisEnabled && frameCounter % ANALYSIS_INTERVAL_FRAMES == 0) {
+            frameAnalysis(image, result, exposure)?.let { analysis ->
+                lastHistogram = analysis.histogram
+                val low = EvMath.ev100(exposure, analysis.lowLuma)
+                val high = EvMath.ev100(exposure, analysis.highLuma)
+                if (low != null && high != null) {
+                    lowEvEma = lowEvEma?.let { it + RANGE_EMA_ALPHA * (low - it) } ?: low
+                    highEvEma = highEvEma?.let { it + RANGE_EMA_ALPHA * (high - it) } ?: high
+                }
+            }
+        }
         if (frameCounter % LOG_INTERVAL_FRAMES == 1) {
             Log.i(
                 TAG,
@@ -338,6 +357,9 @@ class RawMeterSource(
                 rotationDegrees = sensorOrientation,
                 previewWidth = previewSize.width,
                 previewHeight = previewSize.height,
+                histogram = if (frameAnalysisEnabled) lastHistogram else null,
+                sceneLowEv = lowEvEma,
+                sceneHighEv = highEvEma,
             ),
         )
     }
@@ -350,6 +372,9 @@ class RawMeterSource(
         rotationDegrees = sensorOrientation,
         previewWidth = previewSize.width,
         previewHeight = previewSize.height,
+        histogram = lastHistogram,
+        sceneLowEv = lowEvEma,
+        sceneHighEv = highEvEma,
     )
 
     /** Mode ROI statistics over one RAW frame, or null when the ROI says nothing. */
@@ -369,7 +394,13 @@ class RawMeterSource(
                     spot ?: wide
                 }
             }
-            MeteringMode.SPOT -> rawRegionStat(image, result, 0.5f, 0.5f, EvMath.SPOT_ROI_FRACTION)
+            MeteringMode.SPOT -> rawRegionStat(
+                image,
+                result,
+                spotPosition.frameU,
+                spotPosition.frameV,
+                EvMath.SPOT_ROI_FRACTION,
+            )
             MeteringMode.MULTI -> rawRegionStat(image, result, 0.5f, 0.5f, 1.0f)
         } ?: return null
         val luma = regionLuma(region, result)
@@ -406,6 +437,43 @@ class RawMeterSource(
         val cfa = cfa ?: return null
         val black = result.get(CaptureResult.SENSOR_DYNAMIC_BLACK_LEVEL) ?: fixedBlackLevels ?: return null
         val white = result.get(CaptureResult.SENSOR_DYNAMIC_WHITE_LEVEL) ?: whiteLevel
+        val roi = RoiGeometry.roiRect(image.width, image.height, u, v, roiFraction)
+        return withFrameReader(image) { reader, _ ->
+            RawBayerStats.regionStat(
+                reader = reader,
+                cfa = cfa,
+                blackLevels = black,
+                whiteLevel = white,
+                roi = roi,
+            )
+        }
+    }
+
+    private fun frameAnalysis(
+        image: Image,
+        result: CaptureResult,
+        exposure: FrameExposure,
+    ): LumaFrameStats? {
+        val cfa = cfa ?: return null
+        val black = result.get(CaptureResult.SENSOR_DYNAMIC_BLACK_LEVEL) ?: fixedBlackLevels ?: return null
+        val white = result.get(CaptureResult.SENSOR_DYNAMIC_WHITE_LEVEL) ?: whiteLevel
+        return withFrameReader(image) { reader, _ ->
+            RawBayerStats.frameAnalysis(
+                reader = reader,
+                cfa = cfa,
+                blackLevels = black,
+                whiteLevel = white,
+                frameWidth = image.width,
+                frameHeight = image.height,
+            )
+        }
+    }
+
+    /** Builds an absolute little-endian RAW pixel reader for one frame's plane. */
+    private inline fun <T> withFrameReader(
+        image: Image,
+        block: (RawBayerStats.PixelReader, java.nio.ByteBuffer) -> T,
+    ): T? {
         val plane = image.planes.firstOrNull() ?: return null
         val buffer = plane.buffer
         val pixelStride = plane.pixelStride
@@ -414,21 +482,15 @@ class RawMeterSource(
         val byteOrder = buffer.order()
         try {
             buffer.order(ByteOrder.LITTLE_ENDIAN)
-            val roi = RoiGeometry.roiRect(image.width, image.height, u, v, roiFraction)
-            return RawBayerStats.regionStat(
-                reader = { x, y ->
-                    val offset = y * rowStride + x * pixelStride
-                    if (offset < 0 || offset + 1 >= buffer.capacity()) {
-                        null
-                    } else {
-                        buffer.getShort(offset).toInt() and 0xFFFF
-                    }
-                },
-                cfa = cfa,
-                blackLevels = black,
-                whiteLevel = white,
-                roi = roi,
-            )
+            val reader = RawBayerStats.PixelReader { x, y ->
+                val offset = y * rowStride + x * pixelStride
+                if (offset < 0 || offset + 1 >= buffer.capacity()) {
+                    null
+                } else {
+                    buffer.getShort(offset).toInt() and 0xFFFF
+                }
+            }
+            return block(reader, buffer)
         } finally {
             buffer.order(byteOrder)
         }
@@ -523,5 +585,7 @@ class RawMeterSource(
         private const val MIN_RAW_HEIGHT = 480
         private const val PREVIEW_TARGET_WIDTH = 1024
         private const val LOG_INTERVAL_FRAMES = 30
+        private const val ANALYSIS_INTERVAL_FRAMES = 6
+        private const val RANGE_EMA_ALPHA = 0.25
     }
 }

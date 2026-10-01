@@ -41,23 +41,34 @@ object ExposureEngine {
         var shutter = state.shutter
         var quantized = false
         var quantizedResidual = 0.0
+        // Reciprocity failure: the film needs MORE time (more light) than the meter's
+        // answer once exposure passes the model's threshold. In Av+Tv terms the
+        // requirement DROPS by the correction (lower Av+Tv = more light). In A the
+        // extra time rides on the solved shutter; in S/M the lower requirement makes
+        // the solved aperture open / the needle report the missing light.
+        var reciprocityStops = 0.0
+        val model = state.reciprocity
 
         when (state.mode) {
             ExposureMode.APERTURE_PRIORITY -> {
                 val tvNeed = eReq - av(aperture) - accessory
                 val idealShutter = 2.0.pow(-tvNeed)
-                val snapped = nearest(ExposureSolver.SHUTTERS, idealShutter)
-                quantizedResidual = log2(snapped / idealShutter) // >0: slower than ideal
+                val corrected = model?.correctedSeconds(idealShutter) ?: idealShutter
+                reciprocityStops = if (corrected > 0.0) log2(corrected / idealShutter) else 0.0
+                val snapped = nearest(ExposureSolver.SHUTTERS, corrected)
+                quantizedResidual = log2(snapped / corrected) // >0: slower than ideal
                 shutter = snapped
             }
             ExposureMode.SHUTTER_PRIORITY -> {
-                val avNeed = eReq - tv(shutter) - accessory
+                reciprocityStops = model?.correctionStops(shutter) ?: 0.0
+                val avNeed = eReq - reciprocityStops - tv(shutter) - accessory
                 val idealAperture = 2.0.pow(avNeed / 2)
                 val snapped = nearest(ExposureSolver.APERTURES, idealAperture)
                 quantizedResidual = log2(snapped / idealAperture) * 2 // in stops
                 aperture = snapped
             }
             ExposureMode.MANUAL -> {
+                reciprocityStops = model?.correctionStops(shutter) ?: 0.0
                 // Both fixed; the residual is the whole output.
             }
         }
@@ -65,7 +76,7 @@ object ExposureEngine {
             abs(quantizedResidual) > QUANTIZED_FLAG_THRESHOLD
 
         val eEff = av(aperture) + tv(shutter) + accessory
-        val raw = eReq - eEff
+        val raw = (eReq - reciprocityStops) - eEff
         val stops = if (abs(raw) < DEAD_ZONE_STOPS) 0.0 else raw
 
         val suggestions = if (abs(stops) > SUGGESTION_THRESHOLD_STOPS) {
@@ -85,6 +96,7 @@ object ExposureEngine {
                 bias = state.biasStops,
                 accessory = accessory,
                 quantizedResidual = quantizedResidual,
+                reciprocity = reciprocityStops,
             ),
             suggestions = suggestions,
         )
@@ -194,6 +206,7 @@ object ExposureEngine {
         if (reading == null || !reading.valid) return emptyList()
         val eReq = reading.ev100 + log2(state.iso / 100.0) - state.biasStops
         val acc = accessoryOf(state)
+        val model = state.reciprocity
         val center = ExposureSolver.APERTURES.indices.minByOrNull {
             abs(log2(ExposureSolver.APERTURES[it] / centerAperture))
         } ?: return emptyList()
@@ -203,7 +216,8 @@ object ExposureEngine {
             .mapNotNull { i ->
                 val aperture = ExposureSolver.APERTURES[i]
                 val t = 2.0.pow(-(eReq - av(aperture) - acc))
-                aperture to nearest(ExposureSolver.SHUTTERS, t)
+                val corrected = model?.correctedSeconds(t) ?: t
+                aperture to nearest(ExposureSolver.SHUTTERS, corrected)
             }
     }
 

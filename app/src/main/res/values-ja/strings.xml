@@ -95,7 +95,7 @@
     <string name="accent_colour">アクセントカラー</string>
     <string name="calibration_menu">キャリブレーション</string>
     <string name="calibration_desc">センサーオフセットと反射光定数。</string>
-    <string name="version">LUMEN MK·I — v0.6.1</string>
+    <string name="version">LUMEN MK·I — v0.7.0</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">アンバー</string>
@@ -153,7 +153,7 @@
     <string name="tool_highlight_headroom">ハイライト</string>
     <string name="tool_shadow_headroom">シャドウ</string>
     <string name="tool_scene_range">レンジ</string>
-    <string name="tool_need_spots">シーンレンジの測定には MULTI モードでスポットを2点以上追加してください。</string>
+    <string name="tool_need_spots">安定して測光するか、MULTI モードでスポットを2点追加すると、シーンレンジを測定できます。</string>
     <string name="tool_clips">この配置ではハイライトが白飛びします。</string>
     <string name="tool_blocks">この配置ではシャドウがつぶれます。</string>
     <string name="tool_fits">シーンはこのフィルムのラチチュードに収まります。</string>
@@ -163,4 +163,16 @@
     <string name="raw_metering">RAW 測光</string>
     <string name="raw_metering_desc">ISP のトーンカーブを介さず、Bayer センサーデータから直接測光。非対応デバイスでは YUV にフォールバックします。</string>
     <string name="raw_unavailable">RAW 利用不可(%1$s)— YUV にフォールバックしました。</string>
+
+    <!-- v0.7: frame analysis, per-source calibration, spot follow -->
+    <string name="histogram">ヒストグラム表示</string>
+    <string name="histogram_desc">ファインダー上部に明るさ分布を表示し、シーンレンジを自動計算します。</string>
+    <string name="spot_follow">SPOT がタップに追従</string>
+    <string name="spot_follow_desc">タップやドラッグでスポット測光位置を移動します。</string>
+    <string name="calibration_source_yuv">YUV 測光</string>
+    <string name="calibration_source_raw">RAW 測光</string>
+    <string name="reference_ev">基準からの校正</string>
+    <string name="reference_hint">グレーカードや既知の露出計に向け、その真の EV を入力すると、現在の読み取りから選択中ソースの補正値を自動算出します。</string>
+    <string name="reference_apply">適用</string>
+    <string name="reciprocity_short">RECIP</string>
 </resources>

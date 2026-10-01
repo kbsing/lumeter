@@ -25,8 +25,11 @@ class PreferencesRepository(private val context: Context) {
         private val IS_LIVE_METERING = booleanPreferencesKey("is_live_metering")
         private val USE_THIRD_STOPS = booleanPreferencesKey("use_third_stops")
 
-        // Calibration settings
-        private val CALIBRATION_OFFSET = doublePreferencesKey("calibration_offset")
+        // Calibration settings. The EV offset is per metering source (YUV and RAW
+        // read different system constants); the legacy key feeds both on migration.
+        private val CALIBRATION_OFFSET_YUV = doublePreferencesKey("calibration_offset_yuv")
+        private val CALIBRATION_OFFSET_RAW = doublePreferencesKey("calibration_offset_raw")
+        private val CALIBRATION_OFFSET_LEGACY = doublePreferencesKey("calibration_offset")
         private val K_CONSTANT = doublePreferencesKey("k_constant")
 
         // UI settings
@@ -35,6 +38,9 @@ class PreferencesRepository(private val context: Context) {
 
         // Metering source
         private val RAW_MODE = booleanPreferencesKey("raw_mode")
+        private val HISTOGRAM_ENABLED = booleanPreferencesKey("histogram_enabled")
+        private val SPOT_DRAGGABLE = booleanPreferencesKey("spot_draggable")
+        private val CURRENT_FILM = stringPreferencesKey("current_film_stock")
     }
 
     // Read preferences
@@ -49,11 +55,17 @@ class PreferencesRepository(private val context: Context) {
                 ?: MeteringMode.MATRIX,
             isLiveMetering = prefs[IS_LIVE_METERING] ?: true,
             useThirdStops = prefs[USE_THIRD_STOPS] ?: false,
-            calibrationOffset = prefs[CALIBRATION_OFFSET] ?: 0.0,
+            calibrationOffsetYuv = prefs[CALIBRATION_OFFSET_YUV]
+                ?: prefs[CALIBRATION_OFFSET_LEGACY] ?: 0.0,
+            calibrationOffsetRaw = prefs[CALIBRATION_OFFSET_RAW]
+                ?: prefs[CALIBRATION_OFFSET_LEGACY] ?: 0.0,
             kConstant = prefs[K_CONSTANT] ?: 12.5,
             accentName = prefs[ACCENT_COLOR] ?: "AMBER",
             hapticsEnabled = prefs[HAPTICS_ENABLED] ?: true,
             rawMode = prefs[RAW_MODE] ?: false,
+            histogramEnabled = prefs[HISTOGRAM_ENABLED] ?: false,
+            spotDraggable = prefs[SPOT_DRAGGABLE] ?: true,
+            currentFilmStock = prefs[CURRENT_FILM],
         )
     }
 
@@ -75,7 +87,19 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setUseThirdStops(enabled: Boolean) = edit { it[USE_THIRD_STOPS] = enabled }
 
-    suspend fun setCalibrationOffset(value: Double) = edit { it[CALIBRATION_OFFSET] = value }
+    suspend fun setCalibrationOffsetYuv(value: Double) =
+        edit { it[CALIBRATION_OFFSET_YUV] = value }
+
+    suspend fun setCalibrationOffsetRaw(value: Double) =
+        edit { it[CALIBRATION_OFFSET_RAW] = value }
+
+    suspend fun setHistogramEnabled(enabled: Boolean) = edit { it[HISTOGRAM_ENABLED] = enabled }
+
+    suspend fun setSpotDraggable(enabled: Boolean) = edit { it[SPOT_DRAGGABLE] = enabled }
+
+    suspend fun setCurrentFilmStock(name: String?) = edit { prefs ->
+        if (name == null) prefs.remove(CURRENT_FILM) else prefs[CURRENT_FILM] = name
+    }
 
     suspend fun setKConstant(value: Double) = edit { it[K_CONSTANT] = value }
 
@@ -86,7 +110,8 @@ class PreferencesRepository(private val context: Context) {
     suspend fun setRawMode(enabled: Boolean) = edit { it[RAW_MODE] = enabled }
 
     suspend fun resetCalibration() = edit {
-        it[CALIBRATION_OFFSET] = 0.0
+        it[CALIBRATION_OFFSET_YUV] = 0.0
+        it[CALIBRATION_OFFSET_RAW] = 0.0
         it[K_CONSTANT] = 12.5
     }
 }

@@ -27,8 +27,8 @@ class ExposureEngineTest {
         assertEquals(0.0, r.stops!!, 1e-9)
     }
 
-    // 2. A, EV100 3, ISO 100, f/11 -> long exposure solves on the scale, stops = 0
-    //    (no capability table: full scale, no clamping).
+    // 2. A, EV100 3, ISO 100, f/11 -> ideal ≈ 15s now sits ON the extended scale,
+    //    so it solves exactly (stops = 0, no suggestion needed).
     @Test
     fun `case2 A mode dark scene solves long exposure`() {
         val r = ExposureEngine.evaluate(
@@ -36,10 +36,8 @@ class ExposureEngineTest {
             reading(3.0),
         )
         assertEquals(ResultKind.OK, r.kind)
-        // EReq = 3, Av(11) ≈ 6.87 -> Tv ≈ -3.87 -> t ≈ 14.6s -> snaps to 8s or 30s scale.
-        assertNotNull(r.solvedShutter)
         assertTrue(r.solvedShutter!! >= 8.0)
-        assertTrue(r.suggestions.isNotEmpty())
+        assertEquals(0.0, r.stops!!, 1e-9)
     }
 
     // 3. A, ISO 100 -> 400: the solved shutter is 2 stops faster, stops stays 0.
@@ -234,5 +232,81 @@ class ExposureEngineTest {
             assertTrue("ev=$ev stops=${r.stops}", kotlin.math.abs(r.stops!!) <= 0.5 + 1e-9)
             assertFalse("ev=$ev must not be NO_READING", r.kind == ResultKind.NO_READING)
         }
+    }
+
+    // ---- Reciprocity-linked solving ----
+
+    private val triX = com.lumeter.core.tools.Reciprocity.fromStopAt(1.0, 10.0)
+
+    @Test
+    fun `A mode extends the solved shutter by the reciprocity correction`() {
+        // EV100 3, f/11, ISO 100 → ideal ≈ 15s; Tri-X (+1 stop at 10s) demands ~34s,
+        // which snaps to 30s. The needle keeps only the snap residual.
+        val plain = ExposureEngine.evaluate(
+            ExposureState(ExposureMode.APERTURE_PRIORITY, 11.0, 1.0 / 250.0, 100),
+            reading(3.0),
+        )
+        val withModel = ExposureEngine.evaluate(
+            ExposureState(ExposureMode.APERTURE_PRIORITY, 11.0, 1.0 / 250.0, 100, reciprocity = triX),
+            reading(3.0),
+        )
+        assertTrue(withModel.solvedShutter!! > plain.solvedShutter!!)
+        assertTrue(withModel.causes!!.reciprocity > 0.9) // ~+1 stop in that range
+        assertTrue(
+            "stops=${withModel.stops}",
+            kotlin.math.abs(withModel.stops!!) < 0.35, // only the snap residual remains
+        )
+    }
+
+    @Test
+    fun `A mode below the threshold adds nothing`() {
+        val r = ExposureEngine.evaluate(
+            ExposureState(ExposureMode.APERTURE_PRIORITY, 8.0, 1.0 / 250.0, 100, reciprocity = triX),
+            reading(12.0), // 1/60s, well under any threshold
+        )
+        assertEquals(0.0, r.causes!!.reciprocity, 1e-9)
+        assertEquals(1.0 / 60.0, r.solvedShutter!!, 1e-9)
+    }
+
+    @Test
+    fun `S mode raises the requirement so the solved aperture opens`() {
+        // Set 10s shutter; Tri-X demands ~+1 stop of light → aperture one stop wider.
+        val plain = ExposureEngine.evaluate(
+            ExposureState(ExposureMode.SHUTTER_PRIORITY, 5.6, 10.0, 100),
+            reading(3.0),
+        )
+        val withModel = ExposureEngine.evaluate(
+            ExposureState(ExposureMode.SHUTTER_PRIORITY, 5.6, 10.0, 100, reciprocity = triX),
+            reading(3.0),
+        )
+        assertTrue(withModel.solvedAperture!! < plain.solvedAperture!!)
+        assertEquals(1.0, withModel.causes!!.reciprocity, 1e-6)
+    }
+
+    @Test
+    fun `M mode needle reports the pending compensation`() {
+        // Set exposure exactly right for the meter; the film's correction at that
+        // shutter time turns the needle UNDEREXPOSED by exactly that amount.
+        val exact = ExposureState(ExposureMode.MANUAL, 11.0, 14.6, 100)
+        val plain = ExposureEngine.evaluate(exact, reading(3.0))
+        val withModel = ExposureEngine.evaluate(exact.copy(reciprocity = triX), reading(3.0))
+        assertEquals(0.0, plain.stops!!, 0.35)
+        val corr = withModel.causes!!.reciprocity
+        assertTrue("corr=$corr", corr in 0.9..1.5)
+        // Plain side may sit inside the dead zone (snapped to 0); allow one dead zone.
+        assertEquals(plain.stops!! - corr, withModel.stops!!, ExposureEngine.DEAD_ZONE_STOPS)
+    }
+
+    @Test
+    fun `equivalent pairs carry the reciprocity correction`() {
+        val state = ExposureState(ExposureMode.MANUAL, 5.6, 1.0, 100, reciprocity = triX)
+        val pairs = ExposureEngine.equivalentPairs(state, reading(3.0), 5.6)
+        assertTrue(pairs.isNotEmpty())
+        val state2 = state.copy(reciprocity = null)
+        val plain = ExposureEngine.equivalentPairs(state2, reading(3.0), 5.6)
+        // Long-exposure end: corrected pairs need more time than uncorrected ones.
+        val lastCorrected = pairs.last().second
+        val lastPlain = plain.last().second
+        assertTrue(lastCorrected >= lastPlain)
     }
 }

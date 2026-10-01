@@ -300,12 +300,26 @@ private fun DepthOfFieldCard() {
 
 @Composable
 private fun LatitudeCard(appViewModel: AppViewModel, film: FilmStock) {
-    val sceneEvs = appViewModel.spotDisplayEvs.filter { it.isFinite() }
+    // MULTI spots win when present; otherwise fall back to the automatic frame range.
+    val spotEvs = appViewModel.spotDisplayEvs.filter { it.isFinite() }
+    val autoRange = appViewModel.sceneRangeEvs
+    val sceneLow: Double?
+    val sceneHigh: Double?
+    if (spotEvs.size >= 2) {
+        sceneLow = spotEvs.min()
+        sceneHigh = spotEvs.max()
+    } else if (autoRange != null) {
+        sceneLow = autoRange.first
+        sceneHigh = autoRange.second
+    } else {
+        sceneLow = null
+        sceneHigh = null
+    }
     val placed = appViewModel.sceneEv
-    val placement: LatitudePlacement? = if (sceneEvs.size >= 2 && placed != null) {
+    val placement: LatitudePlacement? = if (sceneLow != null && sceneHigh != null && placed != null) {
         LatitudeMath.evaluate(
-            sceneLowEv = sceneEvs.min(),
-            sceneHighEv = sceneEvs.max(),
+            sceneLowEv = sceneLow,
+            sceneHighEv = sceneHigh,
             placedEv100 = placed,
             latitudeLowStops = film.latitudeLowStops,
             latitudeHighStops = film.latitudeHighStops,
@@ -339,7 +353,7 @@ private fun LatitudeCard(appViewModel: AppViewModel, film: FilmStock) {
                 )
                 DofValue(
                     stringResource(R.string.tool_scene_range),
-                    String.format(Locale.US, "%.1f EV", sceneEvs.max() - sceneEvs.min()),
+                    String.format(Locale.US, "%.1f EV", sceneHigh!! - sceneLow!!),
                 )
             }
             Text(

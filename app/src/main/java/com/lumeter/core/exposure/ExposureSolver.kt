@@ -42,6 +42,8 @@ object ExposureSolver {
         1.0 / 2000.0, 1.0 / 1000.0, 1.0 / 500.0, 1.0 / 250.0, 1.0 / 125.0,
         1.0 / 60.0, 1.0 / 30.0, 1.0 / 15.0, 1.0 / 8.0, 1.0 / 4.0,
         1.0 / 2.0, 1.0, 2.0, 4.0, 8.0,
+        // Long-exposure tail: reciprocity territory, where most film corrections live.
+        15.0, 30.0, 60.0, 120.0, 240.0, 480.0,
     )
     val ND_FILTERS = listOf(0, 3, 6, 10)
 

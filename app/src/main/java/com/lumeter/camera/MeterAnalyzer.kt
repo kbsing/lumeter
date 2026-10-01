@@ -32,6 +32,11 @@ data class MeterEngineState(
      *  TextureView fill-center matrix). YUV path leaves these at 0. */
     val previewWidth: Int = 0,
     val previewHeight: Int = 0,
+    /** EV-domain frame histogram; null while disabled or not yet computed. */
+    val histogram: IntArray? = null,
+    /** Automatic scene range (p05/p95 EV100), uncalibrated; null until converged. */
+    val sceneLowEv: Double? = null,
+    val sceneHighEv: Double? = null,
 )
 
 /** A MULTI-mode metering spot in normalized analysis-frame coordinates. */
@@ -60,6 +65,10 @@ class MeterAnalyzer(
     @Volatile var live: Boolean = true
     /** When paused, take exactly one more stable reading, then freeze again. */
     @Volatile var oneShot = false
+    /** SPOT mode's metering point in frame coordinates (default: center). */
+    @Volatile var spotPosition: MeterSpot = MeterSpot(0.5f, 0.5f)
+    /** Histogram overlay + automatic scene range sampling. */
+    @Volatile var frameAnalysisEnabled: Boolean = false
 
     private val accumulator = ReadingAccumulator(MeteringSource.YUV_PREVIEW)
     private var lastSpotEvs: List<Double> = emptyList()
@@ -68,6 +77,9 @@ class MeterAnalyzer(
     private var lastHeight = 0
     private var lastRotation = 0
     private var frameCounter = 0
+    private var lastHistogram: IntArray? = null
+    private var lowEvEma: Double? = null
+    private var highEvEma: Double? = null
 
     override fun analyze(image: ImageProxy) {
         try {
@@ -115,7 +127,11 @@ class MeterAnalyzer(
                         spot ?: wide
                     }
                 }
-                MeteringMode.SPOT -> analyzer.regionStat(0.5f, 0.5f, EvMath.SPOT_ROI_FRACTION)
+                MeteringMode.SPOT -> analyzer.regionStat(
+                    spotPosition.frameU,
+                    spotPosition.frameV,
+                    EvMath.SPOT_ROI_FRACTION,
+                )
                 MeteringMode.MULTI -> analyzer.regionStat(0.5f, 0.5f, 1.0f)
             }
 
@@ -145,6 +161,17 @@ class MeterAnalyzer(
             }
 
             frameCounter++
+            if (frameAnalysisEnabled && frameCounter % ANALYSIS_INTERVAL_FRAMES == 0) {
+                analyzer.frameAnalysis()?.let { analysis ->
+                    lastHistogram = analysis.histogram
+                    val low = EvMath.ev100(exposure, analysis.lowLuma)
+                    val high = EvMath.ev100(exposure, analysis.highLuma)
+                    if (low != null && high != null) {
+                        lowEvEma = lowEvEma?.let { it + RANGE_EMA_ALPHA * (low - it) } ?: low
+                        highEvEma = highEvEma?.let { it + RANGE_EMA_ALPHA * (high - it) } ?: high
+                    }
+                }
+            }
             if (frameCounter % LOG_INTERVAL_FRAMES == 0) {
                 android.util.Log.i(
                     TAG,
@@ -178,6 +205,9 @@ class MeterAnalyzer(
                     analysisWidth = lastWidth,
                     analysisHeight = lastHeight,
                     rotationDegrees = lastRotation,
+                    histogram = if (frameAnalysisEnabled) lastHistogram else null,
+                    sceneLowEv = lowEvEma,
+                    sceneHighEv = highEvEma,
                 ),
             )
         } finally {
@@ -188,6 +218,8 @@ class MeterAnalyzer(
     fun reset() {
         accumulator.reset()
         lastSpotEvs = emptyList()
+        lowEvEma = null
+        highEvEma = null
     }
 
     private fun publishFrozen() {
@@ -199,6 +231,9 @@ class MeterAnalyzer(
                 analysisWidth = lastWidth,
                 analysisHeight = lastHeight,
                 rotationDegrees = lastRotation,
+                histogram = lastHistogram,
+                sceneLowEv = lowEvEma,
+                sceneHighEv = highEvEma,
             ),
         )
     }
@@ -217,6 +252,8 @@ class MeterAnalyzer(
     private companion object {
         private const val TAG = "LumeterMeter"
         private const val LOG_INTERVAL_FRAMES = 30
+        private const val ANALYSIS_INTERVAL_FRAMES = 3
+        private const val RANGE_EMA_ALPHA = 0.25
     }
 }
 

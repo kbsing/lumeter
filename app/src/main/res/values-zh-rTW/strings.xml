@@ -95,7 +95,7 @@
     <string name="accent_colour">主題色</string>
     <string name="calibration_menu">校準</string>
     <string name="calibration_desc">感測器偏移和反射光常數。</string>
-    <string name="version">LUMEN MK·I — v0.6.1</string>
+    <string name="version">LUMEN MK·I — v0.7.0</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">琥珀</string>
@@ -153,7 +153,7 @@
     <string name="tool_highlight_headroom">高光</string>
     <string name="tool_shadow_headroom">暗部</string>
     <string name="tool_scene_range">光比</string>
-    <string name="tool_need_spots">在 MULTI 模式加入兩個以上標點以測量場景光比。</string>
+    <string name="tool_need_spots">保持穩定測光,或在 MULTI 模式加入兩個標點,即可測量場景光比。</string>
     <string name="tool_clips">此放置下高光將溢出。</string>
     <string name="tool_blocks">此放置下暗部將死黑。</string>
     <string name="tool_fits">場景在該膠片寬容度範圍內。</string>
@@ -163,4 +163,16 @@
     <string name="raw_metering">RAW 測光</string>
     <string name="raw_metering_desc">直接從 Bayer 感光元件數據測光,繞過 ISP 色調曲線。裝置不支援時自動回退 YUV 路徑。</string>
     <string name="raw_unavailable">RAW 不可用(%1$s),已回退 YUV。</string>
+
+    <!-- v0.7: frame analysis, per-source calibration, spot follow -->
+    <string name="histogram">直方圖疊加</string>
+    <string name="histogram_desc">在取景器頂部顯示畫面亮度分佈,並據此計算自動場景範圍。</string>
+    <string name="spot_follow">SPOT 跟隨點擊</string>
+    <string name="spot_follow_desc">點按或拖動取景器,移動點測光位置。</string>
+    <string name="calibration_source_yuv">YUV 測光</string>
+    <string name="calibration_source_raw">RAW 測光</string>
+    <string name="reference_ev">參考校準</string>
+    <string name="reference_hint">對準灰卡或可信的測光表,輸入其真實 EV,將根據當前讀數自動算出所選來源的偏移。</string>
+    <string name="reference_apply">套用</string>
+    <string name="reciprocity_short">RECIP</string>
 </resources>

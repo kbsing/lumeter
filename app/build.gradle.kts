@@ -16,8 +16,8 @@ android {
         applicationId = "com.lumeter"
         minSdk = 28
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.6.1"
+        versionCode = 6
+        versionName = "0.7.0"
     }
 
     val signing = Properties().apply {

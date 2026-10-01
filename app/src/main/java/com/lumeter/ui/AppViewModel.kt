@@ -21,6 +21,7 @@ import com.lumeter.core.exposure.ReadingInvalidReason
 import com.lumeter.core.exposure.ResultKind
 import com.lumeter.core.meter.MeteringMode
 import com.lumeter.core.meter.ZoneMath
+import com.lumeter.data.FilmStocks
 import com.lumeter.data.ActiveField
 import com.lumeter.data.FilmStock
 import com.lumeter.data.PreferencesRepository
@@ -131,11 +132,40 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var _accentColor by mutableStateOf(AccentColor.AMBER)
     val accentColor: AccentColor get() = _accentColor
 
-    // Calibration
-    private var _calOffset by mutableStateOf(0.0)
-    val calOffset: Double get() = _calOffset
+    // Calibration, one EV offset per metering source (YUV vs RAW read different
+    // system constants); the displayed/active one follows the live source.
+    private var _calOffsetYuv by mutableStateOf(0.0)
+    val calOffsetYuv: Double get() = _calOffsetYuv
+    private var _calOffsetRaw by mutableStateOf(0.0)
+    val calOffsetRaw: Double get() = _calOffsetRaw
+    val calOffset: Double get() = if (rawActive) _calOffsetRaw else _calOffsetYuv
     private var _kConstant by mutableStateOf(12.5)
     val kConstant: Double get() = _kConstant
+
+    // Frame analysis (histogram overlay + automatic scene range)
+    var histogramEnabled by mutableStateOf(false)
+        private set
+    var engineHistogram by mutableStateOf<IntArray?>(null)
+        private set
+    var engineSceneLowEv by mutableStateOf<Double?>(null)
+        private set
+    var engineSceneHighEv by mutableStateOf<Double?>(null)
+        private set
+
+    /** Whether the SPOT reticle follows taps/drags (else fixed center). */
+    private var _spotDraggable by mutableStateOf(true)
+    val spotDraggable: Boolean get() = _spotDraggable
+    /** SPOT metering point in normalized viewfinder coordinates. */
+    var spotPosition by mutableStateOf(0.5f to 0.5f)
+        private set
+
+    // Current film: drives ISO plus reciprocity-linked solving.
+    private var _currentFilmStock by mutableStateOf<String?>(null)
+    val currentFilmStock: String? get() = _currentFilmStock
+    val currentFilm: com.lumeter.data.FilmStock?
+        get() = _currentFilmStock?.let { name ->
+            FilmStocks.ALL.firstOrNull { it.name == name }
+        }
 
     // RAW metering source
     /** User intent (settings switch); the session may fail to open on unsupported devices. */
@@ -177,6 +207,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private var engineSpotEvs: List<Double> = emptyList()
 
+    /** Automatic scene range on the same pure chain; null until the engine converged. */
+    val sceneRangeEvs: Pair<Double, Double>?
+        get() {
+            val low = engineSceneLowEv ?: return null
+            val high = engineSceneHighEv ?: return null
+            val shift = calOffset + ExposureSolver.calibrationShift(kConstant)
+            return (low + shift) to (high + shift)
+        }
+
     private val multiActive: Boolean get() = meteringMode == MeteringMode.MULTI
 
     /** Zone placement shift: placing above V gives MORE light (EV100 recommendation drops). */
@@ -214,6 +253,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             iso = userIso,
             biasStops = expComp - multi + zoneOffset,
             ndStops = ndFilter,
+            reciprocity = currentFilm?.reciprocity,
         )
     }
 
@@ -260,12 +300,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         liveMetering = p.isLiveMetering
         continuous = p.isLiveMetering
         thirdStopIncrements = p.useThirdStops
-        _calOffset = p.calibrationOffset
+        _calOffsetYuv = p.calibrationOffsetYuv
+        _calOffsetRaw = p.calibrationOffsetRaw
         _kConstant = p.kConstant
         _hapticFeedback = p.hapticsEnabled
         _accentColor = AccentColor.entries.firstOrNull { it.name == p.accentName }
             ?: AccentColor.AMBER
         rawMode = p.rawMode
+        histogramEnabled = p.histogramEnabled
+        _spotDraggable = p.spotDraggable
+        _currentFilmStock = p.currentFilmStock
     }
 
     private var preferencesLoaded = false
@@ -277,6 +321,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         cameraManager.analyzer?.let { engine ->
             engine.meteringMode = meteringMode
             engine.live = continuous
+            engine.frameAnalysisEnabled = histogramEnabled
+            engine.spotPosition = MeterSpot(spotPosition.first, spotPosition.second)
         }
     }
 
@@ -343,6 +389,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         rotationDegrees = state.rotationDegrees
         previewWidth = state.previewWidth
         previewHeight = state.previewHeight
+        engineHistogram = state.histogram
+        engineSceneLowEv = state.sceneLowEv
+        engineSceneHighEv = state.sceneHighEv
 
         val ev = sceneEv
         if (continuous) {
@@ -564,6 +613,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     // Settings
 
+    fun toggleHistogram() {
+        histogramEnabled = !histogramEnabled
+        cameraManager.analyzer?.frameAnalysisEnabled = histogramEnabled
+        cameraManager.rawMeterSource?.frameAnalysisEnabled = histogramEnabled
+        viewModelScope.launch { runCatching { prefs.setHistogramEnabled(histogramEnabled) } }
+    }
+
+    fun setSpotDraggable(enabled: Boolean) {
+        _spotDraggable = enabled
+        viewModelScope.launch { runCatching { prefs.setSpotDraggable(enabled) } }
+    }
+
+    /** SPOT metering point in normalized VIEWFINDER coordinates (UI state only). */
+    fun setSpotPosition(x: Float, y: Float) {
+        spotPosition = x.coerceIn(0.02f, 0.98f) to y.coerceIn(0.02f, 0.98f)
+    }
+
+    /** Forwards the SPOT point in FRAME coordinates (the viewfinder maps screen->frame). */
+    fun pushEngineSpotPosition(frameU: Float, frameV: Float) {
+        val spot = MeterSpot(frameU, frameV)
+        cameraManager.analyzer?.spotPosition = spot
+        cameraManager.rawMeterSource?.spotPosition = spot
+    }
+
     fun setThirdStop(enabled: Boolean) {
         thirdStopIncrements = enabled
         viewModelScope.launch { runCatching { prefs.setUseThirdStops(enabled) } }
@@ -581,9 +654,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     // Calibration
 
-    fun setCalOffset(offset: Double) {
-        _calOffset = offset.coerceIn(-2.0, 2.0)
-        viewModelScope.launch { runCatching { prefs.setCalibrationOffset(calOffset) } }
+    fun setCalOffsetYuv(offset: Double) {
+        _calOffsetYuv = offset.coerceIn(-2.0, 2.0)
+        viewModelScope.launch { runCatching { prefs.setCalibrationOffsetYuv(calOffsetYuv) } }
+    }
+
+    fun setCalOffsetRaw(offset: Double) {
+        _calOffsetRaw = offset.coerceIn(-2.0, 2.0)
+        viewModelScope.launch { runCatching { prefs.setCalibrationOffsetRaw(calOffsetRaw) } }
     }
 
     fun setKConstant(k: Double) {
@@ -592,7 +670,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetCalibration() {
-        _calOffset = 0.0
+        _calOffsetYuv = 0.0
+        _calOffsetRaw = 0.0
         _kConstant = 12.5
         viewModelScope.launch { runCatching { prefs.resetCalibration() } }
     }
@@ -600,8 +679,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // Film
 
     fun applyFilmStock(film: FilmStock) {
+        _currentFilmStock = film.name
         setIso(film.iso)
         navigateTo(AppPage.METER)
+    }
+
+    fun clearFilmStock() {
+        _currentFilmStock = null
+        viewModelScope.launch { runCatching { prefs.setCurrentFilmStock(null) } }
     }
 
     override fun onCleared() {

@@ -3,15 +3,26 @@ package com.lumeter.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lumeter.R
@@ -20,21 +31,25 @@ import com.lumeter.ui.common.FormatUtils
 import com.lumeter.ui.theme.*
 
 /**
- * Calibration screen for adjusting EV offset and K constant.
+ * Calibration screen: per-source EV offset (YUV and RAW read different system
+ * constants), the shared K constant, and a one-step reference wizard that derives
+ * the offset from a known EV (gray card or a trusted meter).
  */
 @Composable
 fun CalibrationPage(
     appViewModel: AppViewModel,
     onBack: () -> Unit,
 ) {
-    
+    var selectedRaw by remember { mutableStateOf(appViewModel.rawMode) }
+    var referenceInput by remember { mutableStateOf("") }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(ColorBody)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
     ) {
-        // Header
         // Header: back pinned left, title centered on the screen.
         Box(
             modifier = Modifier
@@ -57,7 +72,7 @@ fun CalibrationPage(
                     letterSpacing = 0.5.sp
                 )
             }
-            
+
             Text(
                 text = stringResource(R.string.calibration).uppercase(),
                 fontSize = 18.sp,
@@ -67,11 +82,25 @@ fun CalibrationPage(
                 modifier = Modifier.align(Alignment.Center)
             )
         }
-        
+
         Column(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Current scene reading
+            // Source tabs: offsets are independent per metering path.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SourceTab(
+                    label = stringResource(R.string.calibration_source_yuv),
+                    selected = !selectedRaw,
+                    modifier = Modifier.weight(1f),
+                ) { selectedRaw = false }
+                SourceTab(
+                    label = stringResource(R.string.calibration_source_raw),
+                    selected = selectedRaw,
+                    modifier = Modifier.weight(1f),
+                ) { selectedRaw = true }
+            }
+
+            // Current scene reading (live, includes the ACTIVE source's offset)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -88,8 +117,8 @@ fun CalibrationPage(
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = appViewModel.ev100?.let { 
-                        FormatUtils.formatEv(it + appViewModel.calOffset) 
+                    text = appViewModel.ev100?.let {
+                        FormatUtils.formatEv(it)
                     } ?: "—.—",
                     fontSize = 40.sp,
                     fontWeight = FontWeight.Bold,
@@ -102,18 +131,114 @@ fun CalibrationPage(
                     color = ColorDim
                 )
             }
-            
-            // EV Offset control
+
+            // EV Offset control for the selected source
+            val offset = if (selectedRaw) {
+                appViewModel.calOffsetRaw
+            } else {
+                appViewModel.calOffsetYuv
+            }
+            val setOffset: (Double) -> Unit = { value ->
+                if (selectedRaw) appViewModel.setCalOffsetRaw(value) else appViewModel.setCalOffsetYuv(value)
+            }
             CalibrationControl(
-                title = stringResource(R.string.ev_offset),
+                title = stringResource(R.string.ev_offset) +
+                    " · " + if (selectedRaw) {
+                    stringResource(R.string.calibration_source_raw)
+                } else {
+                    stringResource(R.string.calibration_source_yuv)
+                },
                 description = stringResource(R.string.ev_offset_desc),
-                value = appViewModel.calOffset,
+                value = offset,
                 formatValue = { FormatUtils.formatExpComp(it) },
-                onIncrement = { appViewModel.setCalOffset(appViewModel.calOffset + 0.1) },
-                onDecrement = { appViewModel.setCalOffset(appViewModel.calOffset - 0.1) }
+                onIncrement = { setOffset(offset + 0.1) },
+                onDecrement = { setOffset(offset - 0.1) }
             )
-            
-            // K Constant control
+
+            // Reference wizard: derive the offset from a known true EV.
+            val measured = appViewModel.ev100?.let { scene ->
+                // Strip the selected source's offset: the wizard compares against the
+                // meter's RAW indication, not the already-corrected display value.
+                scene - offset
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ColorPanel, RoundedCornerShape(8.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.reference_ev),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ColorInk
+                )
+                Text(
+                    text = stringResource(R.string.reference_hint),
+                    fontSize = 12.sp,
+                    color = ColorDim,
+                    lineHeight = 18.sp
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedTextField(
+                        value = referenceInput,
+                        onValueChange = { referenceInput = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        enabled = measured != null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        placeholder = {
+                            Text(
+                                "12.5",
+                                fontSize = 14.sp,
+                                color = ColorDim,
+                            )
+                        },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = ColorPanel2,
+                            unfocusedContainerColor = ColorPanel2,
+                            focusedTextColor = ColorInk,
+                            unfocusedTextColor = ColorInk,
+                            focusedIndicatorColor = ColorAccent,
+                            unfocusedIndicatorColor = ColorLine,
+                        ),
+                    )
+                    val reference = referenceInput.replace(',', '.').toDoubleOrNull()
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                when {
+                                    reference == null || measured == null -> ColorPanel2
+                                    else -> ColorAccent
+                                },
+                            )
+                            .clickable(enabled = reference != null && measured != null) {
+                                if (reference != null && measured != null) {
+                                    val updated = com.lumeter.core.calibration.CalibrationMath
+                                        .updatedUserCorrection(offset, reference, measured)
+                                    setOffset(updated)
+                                    referenceInput = ""
+                                }
+                            }
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.reference_apply),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (reference != null && measured != null) ColorBody else ColorDim,
+                        )
+                    }
+                }
+            }
+
+            // K Constant control (shared by both sources)
             CalibrationControl(
                 title = stringResource(R.string.calibration_constant),
                 description = stringResource(R.string.calibration_constant_desc),
@@ -122,9 +247,9 @@ fun CalibrationPage(
                 onIncrement = { appViewModel.setKConstant(appViewModel.kConstant + 0.1) },
                 onDecrement = { appViewModel.setKConstant(appViewModel.kConstant - 0.1) }
             )
-            
+
             Spacer(Modifier.height(8.dp))
-            
+
             // Reset button
             Box(
                 modifier = Modifier
@@ -143,7 +268,33 @@ fun CalibrationPage(
                     letterSpacing = 1.sp
                 )
             }
+
+            Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun SourceTab(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) ColorAccent else ColorPanel)
+            .clickable { onClick() }
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (selected) ColorBody else ColorInk,
+        )
     }
 }
 
@@ -177,7 +328,7 @@ private fun CalibrationControl(
                 lineHeight = 18.sp
             )
         }
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -198,7 +349,7 @@ private fun CalibrationControl(
                     color = ColorInk
                 )
             }
-            
+
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -213,7 +364,7 @@ private fun CalibrationControl(
                     color = ColorAccent
                 )
             }
-            
+
             Box(
                 modifier = Modifier
                     .size(44.dp)

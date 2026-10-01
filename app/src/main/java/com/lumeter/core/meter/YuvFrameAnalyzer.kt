@@ -75,6 +75,43 @@ class YuvFrameAnalyzer(
     }
 
     /**
+     * Whole-frame EV-domain analysis for the histogram overlay and automatic scene
+     * range: sorted sparse sample of linear luminances plus a clipped count, ready
+     * for [LumaHistogram.analyze]. The caller decides the sampling cadence.
+     */
+    fun frameAnalysis(step: Int = 4): LumaFrameStats? {
+        if (width <= step || height <= step) return null
+        val columns = width / step
+        val rows = height / step
+        val luminances = DoubleArray(columns * rows)
+        var count = 0
+        var clipped = 0
+        var row = 0
+        while (row < height) {
+            var column = 0
+            while (column < width) {
+                val yCode = ySampler.sample(column, row)
+                val uCode = uSampler.sample(column, row)
+                val vCode = vSampler.sample(column, row)
+                if (yCode != null && uCode != null && vCode != null) {
+                    val rgb = ProcessedLumaMath.yuvToEncodedRgb(yCode, uCode, vCode, encoding)
+                    if (count < luminances.size) {
+                        luminances[count] = decoder.linearLuma(rgb.red, rgb.green, rgb.blue)
+                    }
+                    if (rgb.clipped) clipped += 1
+                    count += 1
+                }
+                column += step
+            }
+            row += step
+        }
+        if (count == 0) return null
+        val usable = minOf(count, luminances.size)
+        luminances.sort(0, usable)
+        return LumaHistogram.analyze(luminances, usable, clipped)
+    }
+
+    /**
      * Linear-luma histogram of the whole frame, sampled on a sparse grid. The bin index is
      * the linear luma scaled to [bins]; callers typically draw it against log/EV ticks.
      */

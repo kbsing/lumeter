@@ -91,7 +91,7 @@ fun FilmPage(
                         FilmTypeSection(
                             type = type,
                             films = films,
-                            currentIso = appViewModel.userIso,
+                            currentFilmStock = appViewModel.currentFilmStock,
                             onSelectFilm = { appViewModel.applyFilmStock(it) }
                         )
                     }
@@ -105,7 +105,7 @@ fun FilmPage(
 private fun FilmTypeSection(
     type: FilmType,
     films: List<FilmStock>,
-    currentIso: Int,
+    currentFilmStock: String?,
     onSelectFilm: (FilmStock) -> Unit,
 ) {
     Column(
@@ -128,7 +128,7 @@ private fun FilmTypeSection(
         films.forEach { film ->
             FilmStockCard(
                 film = film,
-                isSelected = film.iso == currentIso,
+                isSelected = film.name == currentFilmStock,
                 onClick = { onSelectFilm(film) }
             )
         }

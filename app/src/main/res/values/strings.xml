@@ -95,7 +95,7 @@
     <string name="accent_colour">Accent colour</string>
     <string name="calibration_menu">Calibration</string>
     <string name="calibration_desc">Sensor offset and reflected-light constant.</string>
-    <string name="version">LUMEN MK·I — v0.6.1</string>
+    <string name="version">LUMEN MK·I — v0.7.0</string>
     
     <!-- Accent colours -->
     <string name="accent_amber">Amber</string>
@@ -153,7 +153,7 @@
     <string name="tool_highlight_headroom">Highlights</string>
     <string name="tool_shadow_headroom">Shadows</string>
     <string name="tool_scene_range">Range</string>
-    <string name="tool_need_spots">Add two or more MULTI spots to measure the scene range.</string>
+    <string name="tool_need_spots">Keep the metering steady, or add two MULTI spots, so the scene range can be measured.</string>
     <string name="tool_clips">Highlights would clip at this placement.</string>
     <string name="tool_blocks">Shadows would block up at this placement.</string>
     <string name="tool_fits">The scene fits this film\'s latitude.</string>
@@ -163,4 +163,16 @@
     <string name="raw_metering">RAW metering</string>
     <string name="raw_metering_desc">Meter straight from Bayer sensor data, bypassing the ISP tone curve. Falls back to the standard YUV path when unsupported.</string>
     <string name="raw_unavailable">RAW unavailable (%1$s) — using YUV.</string>
+
+    <!-- v0.7: frame analysis, per-source calibration, spot follow -->
+    <string name="histogram">Histogram overlay</string>
+    <string name="histogram_desc">Frame brightness distribution at the top of the viewfinder, with the automatic scene range.</string>
+    <string name="spot_follow">SPOT follows taps</string>
+    <string name="spot_follow_desc">Tap or drag in the viewfinder to move the spot metering point.</string>
+    <string name="calibration_source_yuv">YUV metering</string>
+    <string name="calibration_source_raw">RAW metering</string>
+    <string name="reference_ev">Calibrate from a reference</string>
+    <string name="reference_hint">Aim at a gray card or a trusted meter, enter its true EV, and the offset for the selected source is derived from the live reading.</string>
+    <string name="reference_apply">APPLY</string>
+    <string name="reciprocity_short">RECIP</string>
 </resources>
