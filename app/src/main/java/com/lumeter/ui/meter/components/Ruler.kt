@@ -4,12 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -153,4 +155,102 @@ object RulerLabels {
         } else {
             "${Math.round(1.0 / seconds)}"
         }
+}
+
+/**
+ * Landscape companion of the value ruler: a vertical snapping rail beside the stacked
+ * parameter cards — one 56dp row per stop, current value centered and highlighted,
+ * edges faded, same settle/haptic behavior as the horizontal dial.
+ */
+@Composable
+fun VerticalValueRuler(
+    entries: List<String>,
+    currentIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    hapticEnabled: Boolean = true,
+) {
+    BoxWithConstraints(modifier.fillMaxHeight().width(56.dp)) {
+        val cell = 56.dp
+        val sidePadding = (maxHeight - cell) / 2
+        val pagerState = rememberPagerState(
+            initialPage = currentIndex.coerceIn(0, entries.lastIndex),
+        ) { entries.size }
+        val view = androidx.compose.ui.platform.LocalView.current
+        androidx.compose.runtime.LaunchedEffect(pagerState, hapticEnabled) {
+            androidx.compose.runtime.snapshotFlow { pagerState.currentPage }
+                .drop(1)
+                .collect {
+                    if (hapticEnabled) {
+                        view.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.CLOCK_TICK,
+                        )
+                    }
+                }
+        }
+        LaunchedEffect(currentIndex) {
+            if (!pagerState.isScrollInProgress && pagerState.currentPage != currentIndex &&
+                currentIndex in entries.indices
+            ) {
+                pagerState.animateScrollToPage(currentIndex)
+            }
+        }
+        LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+            if (!pagerState.isScrollInProgress && pagerState.currentPage != currentIndex) {
+                delay(80)
+                if (!pagerState.isScrollInProgress) onSelect(pagerState.currentPage)
+            }
+        }
+
+        VerticalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(10.dp))
+                .background(ColorPanel),
+            pageSpacing = 0.dp,
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = sidePadding),
+        ) { page ->
+            val on = page == pagerState.currentPage
+            Column(
+                Modifier
+                    .height(cell)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+            ) {
+                Box(
+                    Modifier
+                        .width(2.dp)
+                        .height(if (on) 18.dp else 10.dp)
+                        .background(if (on) ColorAccent else ColorDim.copy(alpha = 0.5f)),
+                )
+                Text(
+                    text = entries[page],
+                    style = DisplaySmall.copy(
+                        fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium,
+                        fontSize = 22.sp,
+                        lineHeight = 26.sp,
+                    ),
+                    color = if (on) ColorAccent else ColorDim,
+                    modifier = Modifier.padding(top = 3.dp, bottom = 4.dp),
+                )
+            }
+        }
+        // Edge fades
+        Box(
+            Modifier
+                .width(56.dp)
+                .height(32.dp)
+                .align(Alignment.TopCenter)
+                .background(Brush.verticalGradient(listOf(ColorPanel, ColorPanel.copy(alpha = 0f)))),
+        )
+        Box(
+            Modifier
+                .width(56.dp)
+                .height(32.dp)
+                .align(Alignment.BottomCenter)
+                .background(Brush.verticalGradient(listOf(ColorPanel.copy(alpha = 0f), ColorPanel))),
+        )
+    }
 }

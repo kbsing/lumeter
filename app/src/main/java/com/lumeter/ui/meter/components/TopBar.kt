@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,6 +57,60 @@ fun TopBar(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
             .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CompactToggle(
+            label = when (vm.meteringMode) {
+                MeteringMode.MATRIX -> stringResource(R.string.metering_matrix).uppercase()
+                MeteringMode.CENTER -> stringResource(R.string.metering_center).uppercase()
+                MeteringMode.SPOT -> stringResource(R.string.metering_spot).uppercase()
+                MeteringMode.MULTI -> stringResource(R.string.metering_multi).uppercase()
+            },
+            sub = "METER",
+            on = true,
+            onClick = {
+                val order = listOf(
+                    MeteringMode.MATRIX,
+                    MeteringMode.CENTER,
+                    MeteringMode.SPOT,
+                    MeteringMode.MULTI,
+                )
+                val next = order[(order.indexOf(vm.meteringMode) + 1) % order.size]
+                vm.setMeteringMode(next)
+            },
+        )
+        CompactToggle(
+            label = if (vm.ndFilter == 0) "OFF" else "−${vm.ndFilter}",
+            sub = "ND",
+            on = vm.ndFilter > 0,
+            onClick = vm::cycleNdFilter,
+        )
+        CompactToggle(
+            label = if (vm.continuous) "LIVE" else "HELD",
+            sub = "AE",
+            on = !vm.continuous,
+            onClick = vm::toggleContinuous,
+        )
+        Spacer(Modifier.weight(1f))
+        IconEntry(Icons.Outlined.History, "history") { vm.navigateTo(AppPage.HISTORY) }
+        IconEntry(Icons.Outlined.Movie, "film") { vm.navigateTo(AppPage.FILM) }
+        IconEntry(Icons.Outlined.Settings, "settings") { vm.navigateTo(AppPage.SETTINGS) }
+    }
+}
+
+/**
+ * Landscape left rail: the top-bar controls stacked down the screen edge — metering
+ * mode, ND, LIVE/HELD on top, history/film/settings pushed to the bottom.
+ */
+@Composable
+fun LeftRail(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
+    val vm = appViewModel
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .background(ColorBody)
+            .padding(horizontal = 5.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CompactToggle(
             label = when (vm.meteringMode) {

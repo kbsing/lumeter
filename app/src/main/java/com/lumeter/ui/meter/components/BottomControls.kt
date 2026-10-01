@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -57,8 +58,16 @@ import com.lumeter.ui.theme.LabelTiny
  * action row. The handle bar collapses it again.
  */
 @Composable
-fun BottomControls(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
+fun BottomControls(
+    appViewModel: AppViewModel,
+    modifier: Modifier = Modifier,
+    landscape: Boolean = false,
+) {
     val vm = appViewModel
+    if (landscape) {
+        LandscapePanel(vm, modifier)
+        return
+    }
 
     Column(
         modifier
@@ -298,19 +307,7 @@ private fun ExpandedPanel(vm: AppViewModel) {
                     .clip(RoundedCornerShape(6.dp))
                     .clickable {
                         tick()
-                        val result = vm.exposureResult
-                        val ev = vm.ev100 ?: return@clickable
-                        val ap = when (vm.exposureMode) {
-                            ExposureMode.SHUTTER_PRIORITY ->
-                                result.solvedAperture ?: vm.userAperture
-                            else -> vm.userAperture
-                        }
-                        val sh = when (vm.exposureMode) {
-                            ExposureMode.APERTURE_PRIORITY ->
-                                result.solvedShutter ?: vm.userShutter
-                            else -> vm.userShutter
-                        }
-                        vm.logReading(ev, ap, sh)
+                        logCurrent(vm)
                     }
                     .padding(vertical = 6.dp),
             )
@@ -526,3 +523,295 @@ private fun nearestShutterIndex(value: Double): Int =
             kotlin.math.log2(ExposureSolver.SHUTTERS[it] / value),
         )
     } ?: 0
+
+/** Records the current reading, preferring the solver's value for the derived parameter. */
+private fun logCurrent(vm: AppViewModel) {
+    val result = vm.exposureResult
+    val ev = vm.ev100 ?: return
+    val ap = when (vm.exposureMode) {
+        ExposureMode.SHUTTER_PRIORITY -> result.solvedAperture ?: vm.userAperture
+        else -> vm.userAperture
+    }
+    val sh = when (vm.exposureMode) {
+        ExposureMode.APERTURE_PRIORITY -> result.solvedShutter ?: vm.userShutter
+        else -> vm.userShutter
+    }
+    vm.logReading(ev, ap, sh)
+}
+
+/**
+ * Landscape side panel: A/S/M + EXP COMP on top, the three parameter cards stacked
+ * vertically (active one outlined in accent), the vertical value rail beside them,
+ * and the equivalent-exposure chips pinned at the bottom.
+ */
+@Composable
+private fun LandscapePanel(vm: AppViewModel, modifier: Modifier = Modifier) {
+    val haptics = LocalHapticFeedback.current
+    fun tick() {
+        if (vm.hapticFeedback) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+
+    Column(
+        modifier
+            .fillMaxHeight()
+            .background(ColorPanel)
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        // A/S/M + exposure compensation, same composition as the portrait panel.
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ColorBody)
+                    .padding(2.dp),
+            ) {
+                listOf(
+                    ExposureMode.APERTURE_PRIORITY to "A",
+                    ExposureMode.SHUTTER_PRIORITY to "S",
+                    ExposureMode.MANUAL to "M",
+                ).forEach { (mode, label) ->
+                    val on = vm.exposureMode == mode
+                    Box(
+                        Modifier
+                            .padding(1.dp)
+                            .size(width = 44.dp, height = 32.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (on) ColorInk else Color.Transparent)
+                            .clickable { tick(); vm.setExposureMode(mode) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            label,
+                            fontFamily = BarlowCondensed,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 20.sp,
+                            color = if (on) ColorBody else ColorDim,
+                        )
+                    }
+                }
+            }
+            ExpCompControl(vm, ::tick)
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Row(
+            Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val result = vm.exposureResult
+                val apertureLocked = vm.exposureMode == ExposureMode.SHUTTER_PRIORITY
+                val shutterLocked = vm.exposureMode == ExposureMode.APERTURE_PRIORITY
+                val apertureValue = if (apertureLocked && result.solvedAperture != null) {
+                    result.solvedAperture
+                } else {
+                    vm.userAperture
+                }
+                val shutterValue = if (shutterLocked && result.solvedShutter != null) {
+                    result.solvedShutter
+                } else {
+                    vm.userShutter
+                }
+
+                LandscapeParamCard(
+                    label = stringResource(R.string.iso).uppercase(),
+                    value = vm.userIso.toString(),
+                    active = vm.activeField == ActiveField.ISO,
+                    locked = false,
+                    onClick = { tick(); vm.setActiveField(ActiveField.ISO) },
+                )
+                LandscapeParamCard(
+                    label = stringResource(R.string.aperture).uppercase(),
+                    value = if (apertureLocked) {
+                        stringResource(R.string.auto).uppercase()
+                    } else {
+                        FormatUtils.aperture(apertureValue)
+                    },
+                    active = vm.activeField == ActiveField.APERTURE,
+                    locked = apertureLocked,
+                    onClick = { tick(); vm.setActiveField(ActiveField.APERTURE) },
+                )
+                LandscapeParamCard(
+                    label = stringResource(R.string.shutter).uppercase(),
+                    value = if (shutterLocked) {
+                        stringResource(R.string.auto).uppercase()
+                    } else {
+                        FormatUtils.shutter(shutterValue)
+                    },
+                    active = vm.activeField == ActiveField.SHUTTER,
+                    locked = shutterLocked,
+                    onClick = { tick(); vm.setActiveField(ActiveField.SHUTTER) },
+                )
+
+                Spacer(Modifier.weight(1f))
+
+                val pairs = vm.equivalentPairs
+                if (pairs.isNotEmpty()) {
+                    androidx.compose.foundation.lazy.LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        items(pairs.size) { index ->
+                            val (ap, sh) = pairs[index]
+                            val active = vm.exposureMode == ExposureMode.MANUAL &&
+                                kotlin.math.abs(ap - vm.userAperture) < 0.01
+                            Text(
+                                "f/${ExposureEngine.formatAperture(ap)}  ${FormatUtils.shutter(sh)}",
+                                fontSize = 11.sp,
+                                fontFamily = BarlowCondensed,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (active) ColorBody else ColorInk,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (active) ColorAccent else ColorBody)
+                                    .clickable { tick(); vm.applyEquivalentPair(ap, sh) }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Vertical dial for the active field.
+            val rulerLocked = when (vm.activeField) {
+                ActiveField.ISO -> false
+                ActiveField.APERTURE -> vm.exposureMode == ExposureMode.SHUTTER_PRIORITY
+                ActiveField.SHUTTER -> vm.exposureMode == ExposureMode.APERTURE_PRIORITY
+            }
+            if (rulerLocked) {
+                Box(
+                    Modifier
+                        .width(56.dp)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(ColorBody.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(R.string.auto).uppercase(),
+                        style = LabelTiny,
+                        color = ColorDim,
+                    )
+                }
+            } else {
+                when (vm.activeField) {
+                    ActiveField.ISO -> VerticalValueRuler(
+                        entries = ExposureSolver.ISOS.map { it.toString() },
+                        currentIndex = ExposureSolver.ISOS.indexOf(vm.userIso).coerceAtLeast(0),
+                        onSelect = { tick(); vm.setIso(ExposureSolver.ISOS[it]) },
+                        hapticEnabled = vm.hapticFeedback,
+                    )
+                    ActiveField.APERTURE -> VerticalValueRuler(
+                        entries = ExposureSolver.APERTURES.map { RulerLabels.aperture(it) },
+                        currentIndex = nearestApertureIndex(vm.userAperture),
+                        onSelect = { tick(); vm.setAperture(ExposureSolver.APERTURES[it]) },
+                        hapticEnabled = vm.hapticFeedback,
+                    )
+                    ActiveField.SHUTTER -> VerticalValueRuler(
+                        entries = ExposureSolver.SHUTTERS.map { RulerLabels.shutter(it) },
+                        currentIndex = nearestShutterIndex(vm.userShutter),
+                        onSelect = { tick(); vm.setShutter(ExposureSolver.SHUTTERS[it]) },
+                        hapticEnabled = vm.hapticFeedback,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Full-width landscape variant of the parameter cell: label left, value right. */
+@Composable
+private fun LandscapeParamCard(
+    label: String,
+    value: String,
+    active: Boolean,
+    locked: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (active) ColorPanel2 else ColorBody)
+            .border(
+                1.dp,
+                if (active && !locked) ColorAccent else Color.Transparent,
+                RoundedCornerShape(10.dp),
+            )
+            .clickable(enabled = !locked) { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            if (locked) "$label \u00b7 AUTO" else label,
+            style = LabelTiny.copy(fontSize = 9.sp),
+            color = if (active && !locked) ColorAccent else ColorDim,
+        )
+        Spacer(Modifier.weight(1f))
+        Text(
+            value,
+            style = DisplayCell,
+            color = if (locked) ColorInk.copy(alpha = 0.5f) else ColorInk,
+        )
+    }
+}
+
+/**
+ * Landscape right edge: measure key on top, the big record button centered, log count
+ * at the bottom — the reference's PAUSE / shutter / LOG column.
+ */
+@Composable
+fun ActionRail(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
+    val vm = appViewModel
+    val haptics = LocalHapticFeedback.current
+    fun tick() {
+        if (vm.hapticFeedback) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+    Column(
+        modifier
+            .fillMaxHeight()
+            .background(ColorBody)
+            .padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(ColorInk.copy(alpha = 0.08f))
+                .border(1.5.dp, ColorInk.copy(alpha = 0.8f), CircleShape)
+                .clickable { tick(); vm.measureNow() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                if (vm.measuring) "\u25CF" else "\u25C9",
+                color = if (vm.measuring) ColorAccent else ColorInk,
+                fontSize = 18.sp,
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        Box(
+            Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(ColorInk.copy(alpha = 0.08f))
+                .border(2.dp, ColorAccent, CircleShape)
+                .clickable { tick(); logCurrent(vm) },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("\u25CE", color = ColorAccent, fontSize = 26.sp)
+        }
+        Spacer(Modifier.weight(1f))
+        Text(
+            "\u00B7 ${vm.logEntries.size} \u00B7",
+            style = LabelTiny,
+            color = ColorDim.copy(alpha = 0.7f),
+        )
+    }
+}

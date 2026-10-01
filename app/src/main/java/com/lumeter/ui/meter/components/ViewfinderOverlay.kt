@@ -44,6 +44,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.lumeter.core.exposure.ExposureMode
 import com.lumeter.core.exposure.ReadingInvalidReason
 import com.lumeter.core.meter.MeteringMode
+import com.lumeter.data.ActiveField
 import com.lumeter.ui.AppViewModel
 import com.lumeter.ui.common.FormatUtils
 import com.lumeter.camera.PreviewGeometry
@@ -133,11 +134,30 @@ fun Viewfinder(appViewModel: AppViewModel, modifier: Modifier = Modifier) {
                 .padding(end = 12.dp, top = 10.dp),
         )
 
+        val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        if (landscape) {
+            TopParamsStrip(
+                vm,
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(
+                        top = if (vm.meteringMode == MeteringMode.MULTI) 58.dp else 8.dp,
+                    ),
+            )
+            if (vm.meteringMode != MeteringMode.MULTI) {
+                LiveChip(
+                    vm,
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 10.dp, top = 8.dp),
+                )
+            }
+        }
+
         ReadoutPanel(
             vm,
             Modifier.align(Alignment.BottomCenter),
-            landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-                android.content.res.Configuration.ORIENTATION_LANDSCAPE,
         )
 
         if (vm.flashKey > 0) {
@@ -347,7 +367,6 @@ private fun SpotHandle(
 private fun ReadoutPanel(
     vm: AppViewModel,
     modifier: Modifier = Modifier,
-    landscape: Boolean = false,
 ) {
     val result = vm.exposureResult
     val reading = vm.activeReading
@@ -414,15 +433,13 @@ private fun ReadoutPanel(
                 Text(rightValue, style = DisplayMedium.copy(fontSize = 34.sp, lineHeight = 34.sp), color = rightColor)
             }
         }
-        if (!landscape) {
-            ExposureScaleCanvas(
-                needle = vm.needle,
-                matched = vm.matched,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp),
-            )
-        }
+        ExposureScaleCanvas(
+            needle = vm.needle,
+            matched = vm.matched,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 2.dp),
+        )
         // Attribution + first suggestion, one quiet line under the scale.
         val causes = result.causes
         val hint = buildString {
@@ -567,5 +584,89 @@ fun VerticalExposureScale(
                 )
             }
         }
+    }
+}
+
+/**
+ * Landscape top strip over the finder: the current exposure triple with the dial's
+ * active field highlighted, per the reference layout. In A mode the shutter shown is
+ * the solver's value, in S mode the aperture is.
+ */
+@Composable
+private fun TopParamsStrip(vm: AppViewModel, modifier: Modifier = Modifier) {
+    val result = vm.exposureResult
+    val shutterLocked = vm.exposureMode == ExposureMode.APERTURE_PRIORITY
+    val apertureLocked = vm.exposureMode == ExposureMode.SHUTTER_PRIORITY
+    val shutterText = if (shutterLocked) {
+        result.solvedShutter?.let { FormatUtils.shutter(it) } ?: "--"
+    } else {
+        FormatUtils.shutter(vm.userShutter)
+    }
+    val apertureText = if (apertureLocked) {
+        result.solvedAperture?.let { FormatUtils.aperture(it) } ?: "--"
+    } else {
+        FormatUtils.aperture(vm.userAperture)
+    }
+    Row(
+        modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(ColorBody.copy(alpha = 0.75f))
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
+    ) {
+        StripSeg(shutterText, vm.activeField == ActiveField.SHUTTER)
+        StripDot()
+        StripSeg(apertureText, vm.activeField == ActiveField.APERTURE)
+        StripDot()
+        StripSeg("ISO ${vm.userIso}", vm.activeField == ActiveField.ISO)
+    }
+}
+
+@Composable
+private fun StripSeg(text: String, active: Boolean) {
+    Text(
+        text,
+        fontFamily = BarlowCondensed,
+        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+        fontSize = 16.sp,
+        letterSpacing = 0.5.sp,
+        color = if (active) ColorAccent else ColorInk,
+    )
+}
+
+@Composable
+private fun StripDot() {
+    Box(
+        Modifier
+            .size(3.dp)
+            .clip(CircleShape)
+            .background(ColorDim.copy(alpha = 0.6f)),
+    )
+}
+
+/** LIVE/HELD state chip at the finder's top-left in landscape. */
+@Composable
+private fun LiveChip(vm: AppViewModel, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(ColorBody.copy(alpha = 0.6f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(if (vm.continuous) Color(0xFFE5484D) else ColorDim),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            if (vm.continuous) "LIVE" else "HELD",
+            fontSize = 10.sp,
+            letterSpacing = 1.sp,
+            color = ColorInk.copy(alpha = 0.85f),
+        )
     }
 }

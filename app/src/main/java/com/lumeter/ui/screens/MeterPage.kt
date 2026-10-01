@@ -46,35 +46,31 @@ fun MeterPage(appViewModel: AppViewModel = viewModel()) {
     val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
     if (landscape) {
-        // Landscape: top bar across, then finder | vertical EV rail | side panel.
-        androidx.compose.foundation.layout.Column(
+        // Landscape per the reference: left tool rail | finder | control panel | action rail.
+        androidx.compose.foundation.layout.Row(
             Modifier
                 .fillMaxSize()
                 .background(ColorBody),
         ) {
-            TopBar(appViewModel)
-            androidx.compose.foundation.layout.Row(Modifier.weight(1f)) {
-                if (hasPermission) {
-                    Viewfinder(appViewModel, Modifier.weight(1f))
-                    com.lumeter.ui.meter.components.VerticalExposureScale(
-                        needle = appViewModel.needle,
-                        matched = appViewModel.matched,
-                        modifier = Modifier
-                            .align(Alignment.CenterVertically)
-                            .padding(end = 4.dp),
+            if (hasPermission) {
+                com.lumeter.ui.meter.components.LeftRail(appViewModel)
+                Viewfinder(appViewModel, Modifier.weight(1f))
+                BottomControls(
+                    appViewModel,
+                    Modifier.width(310.dp),
+                    landscape = true,
+                )
+                com.lumeter.ui.meter.components.ActionRail(
+                    appViewModel,
+                    Modifier.width(56.dp),
+                )
+            } else {
+                androidx.compose.foundation.layout.Box(Modifier.weight(1f)) {
+                    CameraPermissionScreen(
+                        onRequestPermission = {
+                            launcher.launch(Manifest.permission.CAMERA)
+                        },
                     )
-                    BottomControls(
-                        appViewModel,
-                        Modifier.width(340.dp),
-                    )
-                } else {
-                    androidx.compose.foundation.layout.Box(Modifier.weight(1f)) {
-                        CameraPermissionScreen(
-                            onRequestPermission = {
-                                launcher.launch(Manifest.permission.CAMERA)
-                            },
-                        )
-                    }
                 }
             }
         }
