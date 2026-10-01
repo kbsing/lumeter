@@ -117,4 +117,5 @@
     <string name="remove_spot">ポイント %1$d を削除</string>
     <string name="language">言語</string>
     <string name="language_system">システム</string>
+    <string name="collapse">折りたたむ</string>
 </resources>

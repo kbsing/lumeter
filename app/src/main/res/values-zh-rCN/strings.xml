@@ -117,4 +117,5 @@
     <string name="remove_spot">移除点 %1$d</string>
     <string name="language">语言</string>
     <string name="language_system">跟随系统</string>
+    <string name="collapse">收起</string>
 </resources>

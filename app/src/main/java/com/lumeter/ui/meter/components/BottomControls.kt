@@ -94,16 +94,24 @@ private fun ExpandedPanel(vm: AppViewModel) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
     ) {
-        // Collapse handle
+        // Collapse handle: a labeled pill, obvious and easy to hit.
         Box(
             Modifier
                 .align(Alignment.CenterHorizontally)
-                .fillMaxWidth()
-                .height(26.dp)
-                .clickable { tick(); vm.toggleControls() },
+                .padding(top = 6.dp)
+                .clip(RoundedCornerShape(50))
+                .border(1.dp, ColorDim, RoundedCornerShape(50))
+                .clickable { tick(); vm.toggleControls() }
+                .padding(horizontal = 18.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("\u25BE", fontSize = 14.sp, color = ColorDim)
+            Text(
+                "\u25BE " + stringResource(R.string.collapse).uppercase(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.sp,
+                color = ColorInk,
+            )
         }
 
         // A/S/M + exposure compensation
