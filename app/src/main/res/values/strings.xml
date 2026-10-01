@@ -1,4 +1,118 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">光度计</string>
+    <string name="app_name">Lumeter</string>
+    
+    <!-- Main Screen -->
+    <string name="app_title">LUMETER</string>
+    <string name="camera_permission_message">Lumeter needs camera access for metering</string>
+    <string name="grant_permission">Grant permission</string>
+    
+    <!-- Metering Modes -->
+    <string name="metering_matrix">MATRIX</string>
+    <string name="metering_center">CENTER</string>
+    <string name="metering_spot">SPOT</string>
+    <string name="metering_multi">MULTI</string>
+    
+    <!-- Exposure Modes -->
+    <string name="mode_aperture_priority">A</string>
+    <string name="mode_shutter_priority">S</string>
+    <string name="mode_manual">M</string>
+    
+    <!-- Controls -->
+    <string name="nd_filter">ND</string>
+    <string name="nd_off">OFF</string>
+    <string name="hold">HOLD</string>
+    <string name="ae_lock">AE-L</string>
+    <string name="live">LIVE</string>
+    <string name="paused">PAUSED</string>
+    <string name="locked">LOCKED</string>
+    
+    <!-- Parameters -->
+    <string name="iso">ISO</string>
+    <string name="aperture">APERTURE</string>
+    <string name="shutter">SHUTTER</string>
+    <string name="auto">AUTO</string>
+    <string name="exp_comp">EXP COMP</string>
+    <string name="ev_iso_100">EV @ ISO 100</string>
+    <string name="exposure">EXPOSURE</string>
+    <string name="lux">LUX</string>
+    
+    <!-- Multi-spot -->
+    <string name="spots">SPOTS</string>
+    <string name="range">RANGE</string>
+    <string name="tap_to_add">TAP TO ADD</string>
+    <string name="clear">CLEAR</string>
+    <string name="avg">AVG</string>
+    <string name="high">HIGH</string>
+    <string name="low">LOW</string>
+    
+    <!-- Navigation -->
+    <string name="history">READING LOG</string>
+    <string name="film">FILM STOCK</string>
+    <string name="settings">SETTINGS</string>
+    <string name="calibration">CALIBRATION</string>
+    <string name="back">Back</string>
+    
+    <!-- History Page -->
+    <string name="readings">READINGS</string>
+    <string name="avg_ev">AVG EV</string>
+    <string name="max_ev">MAX EV</string>
+    <string name="no_readings">No readings yet. Tap the shutter ring to log one.</string>
+    <string name="delete">Delete</string>
+    <string name="untitled_reading">Untitled reading</string>
+    <string name="just_now">Just now</string>
+    <string name="log">LOG</string>
+    
+    <!-- Film Page -->
+    <string name="film_description">Choose a stock to set the meter\'s ISO. Reciprocity hints are shown for exposures beyond one second.</string>
+    <string name="colour_negative">Colour negative</string>
+    <string name="bw_negative">B&amp;W negative</string>
+    <string name="colour_slide">Colour slide</string>
+    <string name="tungsten_negative">Tungsten negative</string>
+    
+    <!-- Film stocks -->
+    <string name="film_portra_400">Kodak Portra 400</string>
+    <string name="film_hp5">Ilford HP5 Plus</string>
+    <string name="film_velvia_50">Fuji Velvia 50</string>
+    <string name="film_trix_400">Kodak Tri-X 400</string>
+    <string name="film_cinestill_800t">CineStill 800T</string>
+    <string name="film_delta_100">Ilford Delta 100</string>
+    
+    <string name="reciprocity_portra">None up to 1s</string>
+    <string name="reciprocity_hp5">+0.5 stop at 10s</string>
+    <string name="reciprocity_velvia">+⅓ stop at 8s</string>
+    <string name="reciprocity_trix">+1 stop at 10s</string>
+    <string name="reciprocity_cinestill">None up to 1s</string>
+    <string name="reciprocity_delta">+1 stop at 10s</string>
+    
+    <!-- Settings Page -->
+    <string name="live_metering">Live metering</string>
+    <string name="live_metering_desc">Continuously read the scene. Off freezes the last value.</string>
+    <string name="third_stop">⅓ stop increments</string>
+    <string name="third_stop_desc">Finer steps for exposure compensation.</string>
+    <string name="haptic_feedback">Haptic feedback</string>
+    <string name="haptic_feedback_desc">Tick when changing values.</string>
+    <string name="accent_colour">Accent colour</string>
+    <string name="calibration_menu">Calibration</string>
+    <string name="calibration_desc">Sensor offset and reflected-light constant.</string>
+    <string name="version">LUMEN MK·I — v1.0.3</string>
+    
+    <!-- Accent colours -->
+    <string name="accent_amber">Amber</string>
+    <string name="accent_signal">Signal</string>
+    <string name="accent_phosphor">Phosphor</string>
+    
+    <!-- Calibration Page -->
+    <string name="current_scene_reading">CURRENT SCENE READING</string>
+    <string name="ev_offset">EV offset</string>
+    <string name="ev_offset_desc">Compare against a known meter or grey card and trim until they agree.</string>
+    <string name="calibration_constant">Calibration constant K</string>
+    <string name="calibration_constant_desc">Canon and Nikon use 12.5, Pentax and Minolta 14. Affects reflected-light readings only.</string>
+    <string name="reset_to_factory">RESET TO FACTORY</string>
+    
+    <!-- Actions -->
+    <string name="pause">❚❚ PAUSE</string>
+    <string name="resume">▶ RESUME</string>
+    <string name="log_reading">Log reading</string>
+    <string name="remove_spot">Remove spot %1$d</string>
 </resources>

@@ -12,8 +12,10 @@ enum class MeteringSource {
 }
 
 enum class MeteringMode {
-    CENTER_WEIGHTED,
+    MATRIX,
+    CENTER,
     SPOT,
+    MULTI,
 }
 
 /** Exposure metadata of the frame a measurement was taken from. */

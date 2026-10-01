@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">光度計</string>
+    
+    <!-- Main Screen -->
+    <string name="app_title">光度計</string>
+    <string name="camera_permission_message">光度計需要相機權限來測光</string>
+    <string name="grant_permission">授予權限</string>
+    
+    <!-- Metering Modes -->
+    <string name="metering_matrix">矩陣</string>
+    <string name="metering_center">中央重點</string>
+    <string name="metering_spot">點測光</string>
+    <string name="metering_multi">多點</string>
+    
+    <!-- Exposure Modes -->
+    <string name="mode_aperture_priority">A</string>
+    <string name="mode_shutter_priority">S</string>
+    <string name="mode_manual">M</string>
+    
+    <!-- Controls -->
+    <string name="nd_filter">ND</string>
+    <string name="nd_off">關閉</string>
+    <string name="hold">保持</string>
+    <string name="ae_lock">AE-L</string>
+    <string name="live">即時</string>
+    <string name="paused">暫停</string>
+    <string name="locked">鎖定</string>
+    
+    <!-- Parameters -->
+    <string name="iso">感光度</string>
+    <string name="aperture">光圈</string>
+    <string name="shutter">快門</string>
+    <string name="auto">自動</string>
+    <string name="exp_comp">曝光補償</string>
+    <string name="ev_iso_100">EV @ ISO 100</string>
+    <string name="exposure">曝光</string>
+    <string name="lux">勒克斯</string>
+    
+    <!-- Multi-spot -->
+    <string name="spots">測光點</string>
+    <string name="range">範圍</string>
+    <string name="tap_to_add">點擊新增</string>
+    <string name="clear">清除</string>
+    <string name="avg">平均</string>
+    <string name="high">最高</string>
+    <string name="low">最低</string>
+    
+    <!-- Navigation -->
+    <string name="history">測光記錄</string>
+    <string name="film">膠片</string>
+    <string name="settings">設定</string>
+    <string name="calibration">校準</string>
+    <string name="back">返回</string>
+    
+    <!-- History Page -->
+    <string name="readings">讀數</string>
+    <string name="avg_ev">平均 EV</string>
+    <string name="max_ev">最大 EV</string>
+    <string name="no_readings">暫無讀數。點擊快門環記錄一個。</string>
+    <string name="delete">刪除</string>
+    <string name="untitled_reading">未命名讀數</string>
+    <string name="just_now">剛剛</string>
+    <string name="log">記錄</string>
+    
+    <!-- Film Page -->
+    <string name="film_description">選擇膠片以設定測光錶的 ISO。超過一秒的曝光會顯示倒易律失效提示。</string>
+    <string name="colour_negative">彩色負片</string>
+    <string name="bw_negative">黑白負片</string>
+    <string name="colour_slide">彩色反轉片</string>
+    <string name="tungsten_negative">鎢絲燈負片</string>
+    
+    <!-- Film stocks -->
+    <string name="film_portra_400">柯達 Portra 400</string>
+    <string name="film_hp5">伊爾福 HP5 Plus</string>
+    <string name="film_velvia_50">富士 Velvia 50</string>
+    <string name="film_trix_400">柯達 Tri-X 400</string>
+    <string name="film_cinestill_800t">CineStill 800T</string>
+    <string name="film_delta_100">伊爾福 Delta 100</string>
+    
+    <string name="reciprocity_portra">1秒內無失效</string>
+    <string name="reciprocity_hp5">10秒時 +0.5級</string>
+    <string name="reciprocity_velvia">8秒時 +⅓級</string>
+    <string name="reciprocity_trix">10秒時 +1級</string>
+    <string name="reciprocity_cinestill">1秒內無失效</string>
+    <string name="reciprocity_delta">10秒時 +1級</string>
+    
+    <!-- Settings Page -->
+    <string name="live_metering">即時測光</string>
+    <string name="live_metering_desc">持續讀取場景。關閉則凍結最後值。</string>
+    <string name="third_stop">⅓級增量</string>
+    <string name="third_stop_desc">曝光補償的更精細步進。</string>
+    <string name="haptic_feedback">觸覺回饋</string>
+    <string name="haptic_feedback_desc">更改值時震動。</string>
+    <string name="accent_colour">主題色</string>
+    <string name="calibration_menu">校準</string>
+    <string name="calibration_desc">感測器偏移和反射光常數。</string>
+    <string name="version">LUMEN MK·I — v1.0.3</string>
+    
+    <!-- Accent colours -->
+    <string name="accent_amber">琥珀</string>
+    <string name="accent_signal">訊號橙</string>
+    <string name="accent_phosphor">螢光綠</string>
+    
+    <!-- Calibration Page -->
+    <string name="current_scene_reading">目前場景讀數</string>
+    <string name="ev_offset">EV 偏移</string>
+    <string name="ev_offset_desc">與已知測光錶或灰卡比較，調整直到一致。</string>
+    <string name="calibration_constant">校準常數 K</string>
+    <string name="calibration_constant_desc">佳能和尼康使用 12.5，賓得和美能達使用 14。僅影響反射式測光。</string>
+    <string name="reset_to_factory">恢復原廠設定</string>
+    
+    <!-- Actions -->
+    <string name="pause">❚❚ 暫停</string>
+    <string name="resume">▶ 恢復</string>
+    <string name="log_reading">記錄讀數</string>
+    <string name="remove_spot">移除點 %1$d</string>
+</resources>

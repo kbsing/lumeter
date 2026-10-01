@@ -17,32 +17,35 @@ import com.lumeter.core.meter.YuvColorEncoding
 import com.lumeter.core.meter.YuvFrameAnalyzer
 import kotlin.math.abs
 
-/** State the meter engine publishes to the UI. */
+/** State the meter engine publishes to the UI. Spot EVs are raw (uncalibrated). */
 data class MeterEngineState(
     val reading: MeterReading?,
-    val aeConverged: Boolean,
-    val cameraIso: Int?,
-    val cameraShutterNs: Long?,
-    val cameraAperture: Float?,
-    val histogram: IntArray?,
-    val source: MeteringSource,
+    /** Per-spot EV100 for MULTI mode, ordered to match the spot list set via [MeterAnalyzer.spots]. */
+    val spotEvs: List<Double> = emptyList(),
+    val aeConverged: Boolean = false,
+    val cameraIso: Int? = null,
+    val cameraShutterNs: Long? = null,
+    val cameraAperture: Float? = null,
+    val source: MeteringSource = MeteringSource.YUV_PREVIEW,
     val analysisWidth: Int = 0,
     val analysisHeight: Int = 0,
     val rotationDegrees: Int = 0,
 )
 
+/** A MULTI-mode metering spot in normalized analysis-frame coordinates. */
+data class MeterSpot(val frameU: Float, val frameV: Float)
+
 /**
- * CameraX ImageAnalysis analyzer that meters the preview stream.
+ * CameraX ImageAnalysis analyzer that meters the preview stream for all four modes.
  *
- * The YUV path mirrors lightstop's CompatibleLightMeter: per-frame robust luma over the
- * metering ROI, linearized through the reported tonemap, converted to EV100 with the
- * frame's own exposure metadata. Camera2ImageInfo gives each analysis frame its full
- * CaptureResult, so no manual timestamp pairing is needed.
+ * Per-frame robust luma over the mode's ROI(s), linearized through the reported tonemap,
+ * converted to EV100 with the frame's own exposure metadata (Camera2Interop session
+ * callback + SENSOR_TIMESTAMP pairing via [CaptureResultStore]). A reading is accepted
+ * only while the camera's exposure has been stable for [STABLE_FRAME_WINDOW] frames
+ * within a small tolerance; stable frames feed a ring whose median is published.
  *
- * A reading is only accepted while the camera's exposure has been stable for
- * [STABLE_FRAME_WINDOW] frames (or AE explicitly reports CONVERGED); stable frames feed a
- * small ring whose median is published. This keeps flicker out of the readout without
- * freezing the live histogram.
+ * HOLD (AE-L) and PAUSE freeze the published state at the last live reading; the analyzer
+ * keeps draining the result store so pairing does not back up behind stale entries.
  */
 class MeterAnalyzer(
     private val onState: (MeterEngineState) -> Unit,
@@ -50,24 +53,32 @@ class MeterAnalyzer(
     private val resultStore: CaptureResultStore,
 ) : ImageAnalysis.Analyzer {
 
-    @Volatile var meteringMode: MeteringMode = MeteringMode.CENTER_WEIGHTED
-    @Volatile var spotX: Float = 0.5f
-    @Volatile var spotY: Float = 0.5f
-    @Volatile var calibrationEv: Double = 0.0
+    @Volatile var meteringMode: MeteringMode = MeteringMode.CENTER
+    @Volatile var spots: List<MeterSpot> = emptyList()
+    @Volatile var hold: Boolean = false
+    @Volatile var live: Boolean = true
 
     private val statRing = ArrayDeque<MeteringFrameStat>()
     private val exposureHistory = ArrayDeque<FrameExposure>()
     private var lastPublishedReading: MeterReading? = null
-    private var lastHistogram: IntArray? = null
+    private var lastSpotEvs: List<Double> = emptyList()
+    private var lastConverged = false
+    private var lastWidth = 0
+    private var lastHeight = 0
+    private var lastRotation = 0
     private var frameCounter = 0
 
-    @androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
     override fun analyze(image: ImageProxy) {
         try {
             val captureResult = resultStore.take(image.imageInfo.timestamp)
             if (captureResult == null) return
 
             val exposure = frameExposure(captureResult) ?: return
+            if (hold || !live) {
+                publishFrozen()
+                return
+            }
+
             val decoder = ProcessedLumaMetadata.decoder(captureResult)
             // YUV_420_888 defaults to the JFIF dataspace (full-range BT.601); CameraX does
             // not expose the per-frame dataspace, so the default encoding is used.
@@ -83,15 +94,10 @@ class MeterAnalyzer(
             )
 
             val mode = meteringMode
-            val spotCenterX = if (mode == MeteringMode.SPOT) spotX else 0.5f
-            val spotCenterY = if (mode == MeteringMode.SPOT) spotY else 0.5f
-            val spot = analyzer.regionStat(
-                spotCenterX,
-                spotCenterY,
-                EvMath.SPOT_ROI_FRACTION,
-            )
             val region: RegionStat? = when (mode) {
-                MeteringMode.CENTER_WEIGHTED -> {
+                MeteringMode.MATRIX -> analyzer.regionStat(0.5f, 0.5f, 1.0f)
+                MeteringMode.CENTER -> {
+                    val spot = analyzer.regionStat(0.5f, 0.5f, EvMath.SPOT_ROI_FRACTION)
                     val wide = analyzer.regionStat(
                         0.5f,
                         0.5f,
@@ -108,21 +114,30 @@ class MeterAnalyzer(
                         spot ?: wide
                     }
                 }
-                MeteringMode.SPOT -> spot
+                MeteringMode.SPOT -> analyzer.regionStat(0.5f, 0.5f, EvMath.SPOT_ROI_FRACTION)
+                MeteringMode.MULTI -> analyzer.regionStat(0.5f, 0.5f, 1.0f)
+            }
+
+            val spotEvs = if (mode == MeteringMode.MULTI) {
+                spots.map { spot ->
+                    analyzer.regionStat(spot.frameU, spot.frameV, EvMath.SPOT_ROI_FRACTION)
+                        ?.let { EvMath.ev100(exposure, it.luma) }
+                        ?: Double.NaN
+                }
+            } else {
+                emptyList()
             }
 
             val converged = exposureStable(exposure) || aeStateConverged(captureResult)
-            val stat = region?.let {
-                EvMath.ev100(exposure, it.luma, calibrationEv)?.let { ev ->
+            val stat = region?.let { reg ->
+                EvMath.ev100(exposure, reg.luma)?.let { ev ->
                     MeteringFrameStat(
                         ev100 = ev,
-                        luma = it.luma,
-                        clipped = it.clippedFraction,
+                        luma = reg.luma,
+                        clipped = reg.clippedFraction,
                         captureIso = exposure.sensitivity,
                         exposureTimeNs = exposure.exposureTimeNs,
                         aperture = exposure.aperture,
-                        ev100BeforeUserCalibration = ev - calibrationEv,
-                        appliedUserCorrectionEv = calibrationEv,
                     )
                 }
             }
@@ -133,16 +148,13 @@ class MeterAnalyzer(
                 statRing.clear()
             }
 
-            if (frameCounter % HISTOGRAM_INTERVAL_FRAMES == 0) {
-                lastHistogram = analyzer.histogram()
-            }
             frameCounter++
             if (frameCounter % LOG_INTERVAL_FRAMES == 0) {
                 val last = statRing.lastOrNull()
                 android.util.Log.i(
                     TAG,
                     "ev100=${last?.ev100} luma=${last?.luma} converged=$converged " +
-                        "ring=${statRing.size} iso=${exposure.sensitivity} " +
+                        "mode=$mode ring=${statRing.size} iso=${exposure.sensitivity} " +
                         "t_ns=${exposure.exposureTimeNs} aperture=${exposure.aperture} " +
                         "tonemap=${captureResult.get(CaptureResult.TONEMAP_MODE)} " +
                         "pairMissed=${resultStore.missedCount}",
@@ -154,25 +166,29 @@ class MeterAnalyzer(
             } else {
                 null
             }
-            // Suppress duplicate emissions: only publish when the median EV actually moved.
             val publishReading = fused?.takeIf { new ->
                 val last = lastPublishedReading
                 last == null || abs(new.sceneEv100 - last.sceneEv100) >= PUBLISH_DELTA_EV
             }
             if (publishReading != null) lastPublishedReading = publishReading
+            if (mode == MeteringMode.MULTI) lastSpotEvs = spotEvs
+            lastConverged = converged
+            lastWidth = image.width
+            lastHeight = image.height
+            lastRotation = image.imageInfo.rotationDegrees
 
             onState(
                 MeterEngineState(
                     reading = publishReading ?: lastPublishedReading,
+                    spotEvs = if (mode == MeteringMode.MULTI) lastSpotEvs else emptyList(),
                     aeConverged = converged,
                     cameraIso = exposure.sensitivity,
                     cameraShutterNs = exposure.exposureTimeNs,
                     cameraAperture = exposure.aperture,
-                    histogram = lastHistogram,
                     source = MeteringSource.YUV_PREVIEW,
-                    analysisWidth = image.width,
-                    analysisHeight = image.height,
-                    rotationDegrees = image.imageInfo.rotationDegrees,
+                    analysisWidth = lastWidth,
+                    analysisHeight = lastHeight,
+                    rotationDegrees = lastRotation,
                 ),
             )
         } finally {
@@ -184,7 +200,20 @@ class MeterAnalyzer(
         statRing.clear()
         exposureHistory.clear()
         lastPublishedReading = null
-        lastHistogram = null
+        lastSpotEvs = emptyList()
+    }
+
+    private fun publishFrozen() {
+        onState(
+            MeterEngineState(
+                reading = lastPublishedReading,
+                spotEvs = lastSpotEvs,
+                aeConverged = lastConverged,
+                analysisWidth = lastWidth,
+                analysisHeight = lastHeight,
+                rotationDegrees = lastRotation,
+            ),
+        )
     }
 
     private fun frameExposure(result: CaptureResult): FrameExposure? {
@@ -219,7 +248,6 @@ class MeterAnalyzer(
         private const val STABLE_FRAME_WINDOW = 4
         private const val STABLE_TOLERANCE_EV = 1.0 / 24.0 // ignore ±1/24 EV HAL jitter
         private const val STAT_RING_SIZE = 5
-        private const val HISTOGRAM_INTERVAL_FRAMES = 4
         private const val PUBLISH_DELTA_EV = 1.0 / 12.0
         private const val LOG_INTERVAL_FRAMES = 30
     }

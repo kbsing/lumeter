@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">露出計</string>
+    
+    <!-- Main Screen -->
+    <string name="app_title">露出計</string>
+    <string name="camera_permission_message">露出計は測光のためにカメラへのアクセスが必要です</string>
+    <string name="grant_permission">許可する</string>
+    
+    <!-- Metering Modes -->
+    <string name="metering_matrix">マルチ</string>
+    <string name="metering_center">中央重点</string>
+    <string name="metering_spot">スポット</string>
+    <string name="metering_multi">マルチ点</string>
+    
+    <!-- Exposure Modes -->
+    <string name="mode_aperture_priority">A</string>
+    <string name="mode_shutter_priority">S</string>
+    <string name="mode_manual">M</string>
+    
+    <!-- Controls -->
+    <string name="nd_filter">ND</string>
+    <string name="nd_off">オフ</string>
+    <string name="hold">ホールド</string>
+    <string name="ae_lock">AE-L</string>
+    <string name="live">ライブ</string>
+    <string name="paused">一時停止</string>
+    <string name="locked">ロック</string>
+    
+    <!-- Parameters -->
+    <string name="iso">ISO感度</string>
+    <string name="aperture">絞り</string>
+    <string name="shutter">シャッター</string>
+    <string name="auto">自動</string>
+    <string name="exp_comp">露出補正</string>
+    <string name="ev_iso_100">EV @ ISO 100</string>
+    <string name="exposure">露出</string>
+    <string name="lux">ルクス</string>
+    
+    <!-- Multi-spot -->
+    <string name="spots">測光点</string>
+    <string name="range">範囲</string>
+    <string name="tap_to_add">タップして追加</string>
+    <string name="clear">クリア</string>
+    <string name="avg">平均</string>
+    <string name="high">最高</string>
+    <string name="low">最低</string>
+    
+    <!-- Navigation -->
+    <string name="history">測光記録</string>
+    <string name="film">フィルム</string>
+    <string name="settings">設定</string>
+    <string name="calibration">キャリブレーション</string>
+    <string name="back">戻る</string>
+    
+    <!-- History Page -->
+    <string name="readings">測定値</string>
+    <string name="avg_ev">平均 EV</string>
+    <string name="max_ev">最大 EV</string>
+    <string name="no_readings">まだ記録がありません。シャッターリングをタップして記録してください。</string>
+    <string name="delete">削除</string>
+    <string name="untitled_reading">無題の記録</string>
+    <string name="just_now">たった今</string>
+    <string name="log">記録</string>
+    
+    <!-- Film Page -->
+    <string name="film_description">フィルムを選択して露出計のISOを設定します。1秒を超える露出には相反則不軌のヒントが表示されます。</string>
+    <string name="colour_negative">カラーネガ</string>
+    <string name="bw_negative">白黒ネガ</string>
+    <string name="colour_slide">カラーリバーサル</string>
+    <string name="tungsten_negative">タングステンネガ</string>
+    
+    <!-- Film stocks -->
+    <string name="film_portra_400">コダック Portra 400</string>
+    <string name="film_hp5">イルフォード HP5 Plus</string>
+    <string name="film_velvia_50">フジ Velvia 50</string>
+    <string name="film_trix_400">コダック Tri-X 400</string>
+    <string name="film_cinestill_800t">CineStill 800T</string>
+    <string name="film_delta_100">イルフォード Delta 100</string>
+    
+    <string name="reciprocity_portra">1秒まで補正なし</string>
+    <string name="reciprocity_hp5">10秒で +0.5段</string>
+    <string name="reciprocity_velvia">8秒で +⅓段</string>
+    <string name="reciprocity_trix">10秒で +1段</string>
+    <string name="reciprocity_cinestill">1秒まで補正なし</string>
+    <string name="reciprocity_delta">10秒で +1段</string>
+    
+    <!-- Settings Page -->
+    <string name="live_metering">ライブ測光</string>
+    <string name="live_metering_desc">シーンを継続的に読み取ります。オフにすると最後の値で固定されます。</string>
+    <string name="third_stop">⅓段刻み</string>
+    <string name="third_stop_desc">露出補正をより細かく調整します。</string>
+    <string name="haptic_feedback">触覚フィードバック</string>
+    <string name="haptic_feedback_desc">値を変更時に振動します。</string>
+    <string name="accent_colour">アクセントカラー</string>
+    <string name="calibration_menu">キャリブレーション</string>
+    <string name="calibration_desc">センサーオフセットと反射光定数。</string>
+    <string name="version">LUMEN MK·I — v1.0.3</string>
+    
+    <!-- Accent colours -->
+    <string name="accent_amber">アンバー</string>
+    <string name="accent_signal">シグナル</string>
+    <string name="accent_phosphor">フォスファー</string>
+    
+    <!-- Calibration Page -->
+    <string name="current_scene_reading">現在のシーン測定値</string>
+    <string name="ev_offset">EV オフセット</string>
+    <string name="ev_offset_desc">既知の露出計またはグレーカードと比較して、一致するまで調整します。</string>
+    <string name="calibration_constant">キャリブレーション定数 K</string>
+    <string name="calibration_constant_desc">キヤノンとニコンは12.5、ペンタックスとミノルタは14を使用します。反射式測光のみに影響します。</string>
+    <string name="reset_to_factory">工場出荷時設定にリセット</string>
+    
+    <!-- Actions -->
+    <string name="pause">❚❚ 一時停止</string>
+    <string name="resume">▶ 再開</string>
+    <string name="log_reading">測定値を記録</string>
+    <string name="remove_spot">ポイント %1$d を削除</string>
+</resources>

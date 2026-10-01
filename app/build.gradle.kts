@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    id("com.google.devtools.ksp") version "2.1.0-1.0.28"
 }
 
 android {
@@ -13,8 +14,8 @@ android {
         applicationId = "com.lumeter"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildTypes {
@@ -53,13 +54,25 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons)
 
+    // CameraX
     implementation(libs.camera.core)
     implementation(libs.camera.camera2)
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
 
+    // Room database
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+
+    // DataStore
     implementation(libs.datastore.preferences)
+    
+    // Serialization
     implementation(libs.kotlinx.serialization.json)
+    
+    // Permissions
+    implementation(libs.accompanist.permissions)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
